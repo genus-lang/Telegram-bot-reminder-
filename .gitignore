@@ -1,0 +1,21 @@
+# Environment Variables
+.env
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# Python Cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Bot Data Files (Do not commit user data!)
+users.json
+sent.json
+pending.json
+knowledge.json
+announcers.json
