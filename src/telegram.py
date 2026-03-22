@@ -11,10 +11,13 @@ def schedule_delete(chat_id, message_id, delay_seconds=21600):
         "delete_at": time.time() + delay_seconds
     })
 
-def send_message(chat_id, text, auto_delete=True):
+def send_message(chat_id, text, auto_delete=True, parse_mode="HTML"):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    payload = {"chat_id": chat_id, "text": text}
+    if parse_mode:
+        payload["parse_mode"] = parse_mode
     try:
-        resp = requests.post(url, data={"chat_id": chat_id, "text": text}, timeout=10).json()
+        resp = requests.post(url, data=payload, timeout=10).json()
         if resp.get("ok"):
             msg_id = str(resp["result"]["message_id"])
             if auto_delete:
@@ -24,8 +27,8 @@ def send_message(chat_id, text, auto_delete=True):
         pass
     return None
 
-def send_message_get_id(chat_id, text, auto_delete=True):
-    return send_message(chat_id, text, auto_delete)
+def send_message_get_id(chat_id, text, auto_delete=True, parse_mode="HTML"):
+    return send_message(chat_id, text, auto_delete, parse_mode)
 
 def send_chat_action(chat_id, action="typing"):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendChatAction"

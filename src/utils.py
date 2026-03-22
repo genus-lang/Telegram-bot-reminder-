@@ -1,5 +1,9 @@
 import re
 
+def escape_html(text):
+    """Sanitize text for Telegram HTML parse mode to prevent markup breaks."""
+    return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
 def extract_keywords(text):
     """Extract meaningful keywords from text (lowercase, no short/stop words)."""
     stop_words = {

@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from src.config import DEFAULT_REMINDER, executor
 from src.database import users, sent, sent_col
 from src.telegram import send_message
+from src.utils import escape_html
 
 def fetch_upcoming_contests():
     contests = []
@@ -58,10 +59,11 @@ def maybe_send(chat_id, platform, contest_name, time_left_seconds):
     key = alert_key(platform, chat_id, contest_name)
     if key in sent: return
     minutes_left = max(1, int(time_left_seconds // 60))
+    safe_name = escape_html(contest_name)
     executor.submit(
         send_message,
         chat_id,
-        f"🚀 {platform} Alert!\n\n{contest_name}\nStarts in about {minutes_left} minutes"
+        f"🚀 <b>{platform} Alert!</b>\n\n<code>{safe_name}</code>\nStarts in about <b>{minutes_left} minutes</b>!"
     )
     sent.add(key)
     executor.submit(sent_col.insert_one, {"_id": key})
