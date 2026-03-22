@@ -27,6 +27,22 @@ def send_message(chat_id, text, auto_delete=True, parse_mode="HTML"):
         pass
     return None
 
+def send_photo(chat_id, photo_url, caption="", auto_delete=True, parse_mode="HTML"):
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
+    payload = {"chat_id": chat_id, "photo": photo_url, "caption": caption}
+    if parse_mode:
+        payload["parse_mode"] = parse_mode
+    try:
+        resp = requests.post(url, data=payload, timeout=10).json()
+        if resp.get("ok"):
+            msg_id = str(resp["result"]["message_id"])
+            if auto_delete:
+                schedule_delete(chat_id, msg_id)
+            return msg_id
+    except:
+        pass
+    return None
+
 def send_message_get_id(chat_id, text, auto_delete=True, parse_mode="HTML"):
     return send_message(chat_id, text, auto_delete, parse_mode)
 
