@@ -92,7 +92,6 @@ def check_codeforces():
         for contest in data.get("result", []):
             if contest.get("phase") != "BEFORE": continue
             name = contest.get("name", "Unknown contest")
-            if not is_rated_contest("Codeforces", name): continue
             start = contest.get("startTimeSeconds")
             if not start: continue
             for chat_id, info in users.items():
@@ -109,7 +108,6 @@ def check_codechef():
         now = datetime.now(timezone.utc)
         for contest in data.get("future_contests", []):
             name = contest.get("contest_name", "Unknown contest")
-            if not is_rated_contest("CodeChef", name): continue
             start_str = contest.get("contest_start_date_iso")
             if not start_str: continue
             start = datetime.fromisoformat(start_str.replace("Z", "+00:00"))
@@ -129,7 +127,6 @@ def check_leetcode():
         now = datetime.utcnow().timestamp()
         for contest in contests:
             name = contest.get("title", "Unknown contest")
-            if not is_rated_contest("LeetCode", name): continue
             start = contest.get("startTime")
             if start is None: continue
             for chat_id, info in users.items():

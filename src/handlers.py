@@ -1,6 +1,6 @@
 import time
 import threading
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from src.config import ADMIN_CHAT_ID, MATCH_THRESHOLD, DEFAULT_REMINDER, executor
 from src.database import (
     users, users_col, pending, pending_col,
@@ -172,8 +172,9 @@ def process_message(update):
             for i, (platform, name, start_ts, time_left, is_rated) in enumerate(upcoming[:10]):
                 emoji = platform_emoji.get(platform, "🔹")
                 countdown = format_countdown(time_left)
-                start_dt = datetime.fromtimestamp(start_ts, tz=timezone.utc)
-                date_str = start_dt.strftime("%b %d, %H:%M UTC")
+                ist_tz = timezone(timedelta(hours=5, minutes=30))
+                start_dt = datetime.fromtimestamp(start_ts, tz=ist_tz)
+                date_str = start_dt.strftime("%b %d, %I:%M %p IST")
                 safe_name = escape_html(name)
                 rating_tag = "⭐ <b>[Rated]</b>" if is_rated else "⚪ <i>[Unrated]</i>"
                 lines.append(f"{emoji} <b>{platform}</b> {rating_tag}\n   <code>{safe_name}</code>\n   📅 <i>{date_str}</i>\n   ⏳ <b>{countdown}</b>\n")
