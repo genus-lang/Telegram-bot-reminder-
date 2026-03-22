@@ -170,13 +170,14 @@ def process_message(update):
         else:
             lines = ["⏱ <b>Upcoming Contests</b>\n"]
             platform_emoji = {"Codeforces": "🟦", "CodeChef": "🟧", "LeetCode": "🟨"}
-            for i, (platform, name, start_ts, time_left) in enumerate(upcoming[:10]):
+            for i, (platform, name, start_ts, time_left, is_rated) in enumerate(upcoming[:10]):
                 emoji = platform_emoji.get(platform, "🔹")
                 countdown = format_countdown(time_left)
                 start_dt = datetime.fromtimestamp(start_ts, tz=timezone.utc)
                 date_str = start_dt.strftime("%b %d, %H:%M UTC")
                 safe_name = escape_html(name)
-                lines.append(f"{emoji} <b>{platform}</b>\n   <code>{safe_name}</code>\n   📅 <i>{date_str}</i>\n   ⏳ <b>{countdown}</b>\n")
+                rating_tag = "⭐ <b>[Rated]</b>" if is_rated else "⚪ <i>[Unrated]</i>"
+                lines.append(f"{emoji} <b>{platform}</b> {rating_tag}\n   <code>{safe_name}</code>\n   📅 <i>{date_str}</i>\n   ⏳ <b>{countdown}</b>\n")
             send_message(chat_id, "\n".join(lines))
 
     elif text == "/stats":

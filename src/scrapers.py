@@ -27,9 +27,9 @@ def fetch_upcoming_contests():
         for c in data.get("result", []):
             if c.get("phase") != "BEFORE": continue
             name = c.get("name", "Unknown")
-            if not is_rated_contest("Codeforces", name): continue
+            is_rated = is_rated_contest("Codeforces", name)
             start = c.get("startTimeSeconds")
-            if start: contests.append(("Codeforces", name, start, start - now_ts))
+            if start: contests.append(("Codeforces", name, start, start - now_ts, is_rated))
     except: pass
 
     try:
@@ -37,12 +37,13 @@ def fetch_upcoming_contests():
         data = requests.get(url, timeout=15).json()
         for c in data.get("future_contests", []):
             name = c.get("contest_name", "Unknown")
-            if not is_rated_contest("CodeChef", name): continue
+            is_rated = is_rated_contest("CodeChef", name)
             start_str = c.get("contest_start_date_iso")
             if start_str:
                 start_dt = datetime.fromisoformat(start_str.replace("Z", "+00:00"))
-                start_ts = start_dt.timestamp()
-                contests.append(("CodeChef", name, start_ts, start_ts - now_ts))
+                start = start_dt.timestamp()
+                if start > now_ts:
+                    contests.append(("CodeChef", name, start, start - now_ts, is_rated))
     except: pass
 
     try:
@@ -51,10 +52,10 @@ def fetch_upcoming_contests():
         res = requests.post(url, json=query, timeout=15).json()
         for c in res.get("data", {}).get("allContests", []):
             name = c.get("title", "Unknown")
-            if not is_rated_contest("LeetCode", name): continue
+            is_rated = is_rated_contest("LeetCode", name)
             start = c.get("startTime")
             if start and start > now_ts:
-                contests.append(("LeetCode", name, start, start - now_ts))
+                contests.append(("LeetCode", name, start, start - now_ts, is_rated))
     except: pass
 
     seen = set()
