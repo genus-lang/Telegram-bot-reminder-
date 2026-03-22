@@ -1,11 +1,24 @@
 import time
+import os
+import threading
 import requests
+from flask import Flask
 from src.config import BOT_TOKEN, CHECK_EVERY_SECONDS, executor
 from src.database import pending, pending_col, history_col
 from src.scrapers import check_codeforces, check_codechef, check_leetcode
 from src.handlers import process_message
 
 last_update_id = None
+
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Bot is alive"
+
+def run_server():
+    port = int(os.environ.get("PORT", 8000))
+    app.run(host='0.0.0.0', port=port)
 
 def handle_updates():
     global last_update_id
@@ -46,6 +59,9 @@ def delete_expired_messages():
         executor.submit(delete_telegram_message, doc["chat_id"], doc["message_id"], doc["_id"])
 
 def main():
+    print("Starting Flask Keep-Alive Server...")
+    threading.Thread(target=run_server, daemon=True).start()
+    
     print("Bot is running...")
     while True:
         handle_updates()
