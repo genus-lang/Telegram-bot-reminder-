@@ -149,47 +149,53 @@ def process_message(update):
     if not text: return
     set_active(chat_id)
 
-    # UX Menu Overrides
-    if text == "🏆 Contests":
+    # UX Menu Overrides - Safe Substring Matching
+    if "Upcoming Contests" in text:
+        text = "/next"
+    elif "Contests Menu" in text:
+        return
+    elif "Contests" in text:
         send_message(chat_id, "🏆 <b>Contests Menu</b>\nSelect an option below:", reply_markup=get_contest_menu())
         return
-    elif text == "🎓 Colleges":
+    elif "Colleges Menu" in text:
+        return
+    elif "Colleges" in text and "Back" not in text:
         send_message(chat_id, "🎓 <b>Colleges Menu</b>\nSelect your branch:", reply_markup=get_college_menu())
         return
-    elif text == "🔙 Back to Main Menu":
+    elif "Main Menu" in text:
         send_message(chat_id, "🏠 <b>Main Menu</b>\nChoose a category:", reply_markup=get_main_menu())
         return
-    elif text == "🔙 Back to Colleges":
+    elif "Back to Colleges" in text:
         send_message(chat_id, "🎓 <b>Colleges Menu</b>\nSelect your branch:", reply_markup=get_college_menu())
         return
         
-    elif text in ["🏫 CSE", "⚙️ MAE", "📡 ECE", "🧮 MNC"]:
-        branch = text.split(" ")[1]
+    elif any(b in text for b in ["CSE", "MAE", "ECE", "MNC"]):
+        branch = next(b for b in ["CSE", "MAE", "ECE", "MNC"] if b in text)
         update_user_field(chat_id, "college_branch", branch)
         send_message(chat_id, f"✅ <b>Branch set to {branch}!</b>\n\nNow select your Year:", reply_markup=get_year_menu())
         return
         
-    elif text in ["🎓 Year 1", "🎓 Year 2", "🎓 Year 3", "🎓 Year 4"]:
-        year = text.split(" ")[2]
+    elif any(y in text for y in ["Year 1", "Year 2", "Year 3", "Year 4"]):
+        year = next(y.split(" ")[1] for y in ["Year 1", "Year 2", "Year 3", "Year 4"] if y in text)
         update_user_field(chat_id, "college_year", int(year))
         send_message(chat_id, f"✅ <b>Year {year} selected!</b>\n\nNow select your Group:", reply_markup=get_group_menu())
         return
         
-    elif text in ["👥 Group 1", "👥 Group 2"]:
-        group = text.split(" ")[2]
+    elif any(g in text for g in ["Group 1", "Group 2"]):
+        group = next(g.split(" ")[1] for g in ["Group 1", "Group 2"] if g in text)
         update_user_field(chat_id, "college_group", int(group))
         send_message(chat_id, f"✅ <b>Group {group} selected!</b>\n\nWhen should I remind you about your scheduled lectures?", reply_markup=get_lecture_reminder_menu())
         return
         
-    elif text in ["🔔 5 Min Before", "🔔 15 Min Before", "🔔 30 Min Before"]:
-        minutes = int(text.split(" ")[1])
+    elif "Before" in text and any(m in text for m in ["5 Min", "15 Min", "30 Min"]):
+        minutes = int(next(m.split(" ")[0] for m in ["5 Min", "15 Min", "30 Min"] if m in text))
         update_user_field(chat_id, "college_reminder", minutes * 60)
-        send_message(chat_id, f"🎉 <b>Setup Complete!</b>\n\nI will remind you exactly <b>{minutes} minutes</b> before your scheduled {users[chat_id].get('college_branch', 'College')} lectures begin!\n\n<i>(Note: Lecture timetable synchronization feature coming soon!)</i>", reply_markup=get_main_menu())
+        send_message(chat_id, f"🎉 <b>Setup Complete!</b>\n\nI will remind you exactly <b>{minutes} minutes</b> before your scheduled {users[chat_id].get('college_branch', 'College')} lectures begin!", reply_markup=get_main_menu())
         return
-    elif text == "⏰ 15 Min": text = "/15"
-    elif text == "⏰ 30 Min": text = "/30"
-    elif text == "⏰ 60 Min": text = "/60"
-    elif text == "📅 Upcoming Contests": text = "/next"
+        
+    elif "15 Min" in text: text = "/15"
+    elif "30 Min" in text: text = "/30"
+    elif "60 Min" in text: text = "/60"
 
     if chat_id == ADMIN_CHAT_ID and msg.get("reply_to_message"):
         replied_msg_id = str(msg["reply_to_message"]["message_id"])
