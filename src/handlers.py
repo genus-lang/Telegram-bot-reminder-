@@ -62,8 +62,7 @@ def find_best_match(user_text):
         stored_keywords = set(entry.get("keywords", []))
         if not stored_keywords: continue
         common = user_keywords & stored_keywords
-        total = user_keywords | stored_keywords
-        score = len(common) / len(total) if total else 0
+        score = len(common) / len(stored_keywords) if stored_keywords else 0
         if score > best_score:
             best_score = score
             best_answer = entry["answer"]

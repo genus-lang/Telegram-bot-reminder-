@@ -11,7 +11,7 @@ MONGO_URI = os.getenv("MONGO_URI")
 
 DEFAULT_REMINDER = 1800   # 30 min
 CHECK_EVERY_SECONDS = 30  # poll more often, but still light
-MATCH_THRESHOLD = 0.5     # minimum similarity to auto-reply (0.0 - 1.0)
+MATCH_THRESHOLD = 0.75    # 75% of stored keywords must be present in user question
 
 # Threading Executor for background tasks
 executor = ThreadPoolExecutor(max_workers=50)
