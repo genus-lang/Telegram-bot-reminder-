@@ -2,7 +2,7 @@ import requests
 from datetime import datetime, timezone
 from src.config import DEFAULT_REMINDER, executor
 from src.database import users, sent, sent_col
-from src.telegram import send_message
+from src.telegram import send_message, send_photo
 from src.utils import escape_html
 
 def is_rated_contest(platform, name):
