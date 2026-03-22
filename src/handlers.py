@@ -115,7 +115,7 @@ def process_message(update):
         if new_id and new_id not in announcers:
             announcers.add(new_id)
             executor.submit(announcers_col.insert_one, {"_id": new_id})
-            send_message(chat_id, f"✅ User <code>{new_id}</code> can now safely <code>/announce</code>.")
+            send_message(chat_id, f"✅ User <code>{new_id}</code> can now safely /announce.")
 
     elif text.startswith("/remove_announcer ") and chat_id == ADMIN_CHAT_ID:
         rem_id = text[len("/remove_announcer "):].strip()
@@ -137,17 +137,17 @@ def process_message(update):
         welcome = (
             "<b>👋 Welcome to the Contest Alert & AI Assistant!</b>\n\n"
             "<b>🔔 Reminders:</b>\n"
-            "<code>/15</code>  → Alert 15 mins before\n"
-            "<code>/30</code>  → Alert 30 mins before\n"
-            "<code>/60</code>  → Alert 1 hour before\n\n"
+            "/15  → Alert 15 mins before\n"
+            "/30  → Alert 30 mins before\n"
+            "/60  → Alert 1 hour before\n\n"
             "<b>🗓 Live Data:</b>\n"
-            "<code>/next</code>  → View upcoming contests\n\n"
+            "/next  → View upcoming contests\n\n"
             "💬 <i>Or just type any question, and I'll find the answer!</i>"
         )
         if chat_id == ADMIN_CHAT_ID:
-            welcome += "\n\n<b>🔐 Admin Commands:</b>\n<code>/stats</code> → Bot stats\n<code>/announce &lt;msg&gt;</code> → Broadcast\n<code>/add_announcer &lt;id&gt;</code> → Add mod\n<code>/remove_announcer &lt;id&gt;</code> → Remove mod\n<code>/announcers</code> → List mods"
+            welcome += "\n\n<b>🔐 Admin Commands:</b>\n/stats → Bot stats\n/announce &lt;msg&gt; → Broadcast\n/add_announcer &lt;id&gt; → Add mod\n/remove_announcer &lt;id&gt; → Remove mod\n/announcers → List mods"
         elif chat_id in announcers:
-            welcome += "\n\n<b>📢 Announcer Commands:</b>\n<code>/announce &lt;msg&gt;</code> → Broadcast message"
+            welcome += "\n\n<b>📢 Announcer Commands:</b>\n/announce &lt;msg&gt; → Broadcast message"
         send_message(chat_id, welcome)
 
     elif text == "/15":
