@@ -197,8 +197,9 @@ def process_message(update):
     elif text == "/next":
         send_message(chat_id, "🔍 <i>Fetching contests...</i>")
         upcoming = fetch_upcoming_contests()
+        upcoming = [c for c in upcoming if c[3] <= 14 * 24 * 3600]
         if not upcoming:
-            send_message(chat_id, "😕 <i>No upcoming contests found right now.</i>")
+            send_message(chat_id, "😕 <i>No upcoming contests found in the next 2 weeks.</i>")
         else:
             lines = ["⏱ <b>Upcoming Contests</b>\n"]
             platform_emoji = {"Codeforces": "🟦", "CodeChef": "🟧", "LeetCode": "🟨"}
