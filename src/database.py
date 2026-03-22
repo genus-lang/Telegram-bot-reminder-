@@ -3,7 +3,7 @@ import json
 import os
 from src.config import MONGO_URI, ADMIN_CHAT_ID
 
-client = pymongo.MongoClient(MONGO_URI)
+client = pymongo.MongoClient(MONGO_URI, serverSelectionTimeoutMS=2000)
 db = client["telegram_bot_db"]
 
 users_col = db["users"]

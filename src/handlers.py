@@ -191,7 +191,6 @@ def process_message(update):
     elif not text.startswith("/") and chat_id != ADMIN_CHAT_ID:
         send_chat_action(chat_id, action="typing")
         answer, score = find_best_match(text)
-        time.sleep(1.5)
         if answer and score >= MATCH_THRESHOLD:
             safe_ans = escape_html(answer)
             send_message(chat_id, f"\U0001f916 <i>{safe_ans}</i>")

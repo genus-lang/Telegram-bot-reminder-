@@ -20,6 +20,10 @@ def home():
 def health():
     return "OK", 200
 
+@app.route('/warm')
+def warm():
+    return "Warmed", 200
+
 def run_server():
     port = int(os.environ.get("PORT", 8000))
     app.run(host='0.0.0.0', port=port)
