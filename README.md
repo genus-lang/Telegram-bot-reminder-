@@ -52,7 +52,7 @@ MONGO_URI="mongodb+srv://<username>:<password>@cluster0.abcde.mongodb.net/?retry
 ### 5. Start the Bot
 Run the main script:
 ```bash
-python Bot.py
+python -m src.main
 ```
 *(On the very first launch, if you have existing legacy `.json` files in the directory, the bot will automatically detect them and securely migrate the data over to MongoDB before clearing them).*
 
