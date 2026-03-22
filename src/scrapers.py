@@ -5,6 +5,18 @@ from src.database import users, sent, sent_col
 from src.telegram import send_message
 from src.utils import escape_html
 
+def is_rated_contest(platform, name):
+    """Filter out unrated/practice contests across platforms."""
+    name_lower = name.lower()
+    if platform == "Codeforces":
+        keywords = ["div. 1", "div. 2", "div. 3", "div. 4", "educational", "global round"]
+        return any(kw in name_lower for kw in keywords) and "testing" not in name_lower
+    elif platform == "CodeChef":
+        return "starter" in name_lower
+    elif platform == "LeetCode":
+        return "weekly" in name_lower
+    return True
+
 def fetch_upcoming_contests():
     contests = []
     now_ts = datetime.now(timezone.utc).timestamp()
@@ -15,6 +27,7 @@ def fetch_upcoming_contests():
         for c in data.get("result", []):
             if c.get("phase") != "BEFORE": continue
             name = c.get("name", "Unknown")
+            if not is_rated_contest("Codeforces", name): continue
             start = c.get("startTimeSeconds")
             if start: contests.append(("Codeforces", name, start, start - now_ts))
     except: pass
@@ -24,6 +37,7 @@ def fetch_upcoming_contests():
         data = requests.get(url, timeout=15).json()
         for c in data.get("future_contests", []):
             name = c.get("contest_name", "Unknown")
+            if not is_rated_contest("CodeChef", name): continue
             start_str = c.get("contest_start_date_iso")
             if start_str:
                 start_dt = datetime.fromisoformat(start_str.replace("Z", "+00:00"))
@@ -37,6 +51,7 @@ def fetch_upcoming_contests():
         res = requests.post(url, json=query, timeout=15).json()
         for c in res.get("data", {}).get("allContests", []):
             name = c.get("title", "Unknown")
+            if not is_rated_contest("LeetCode", name): continue
             start = c.get("startTime")
             if start and start > now_ts:
                 contests.append(("LeetCode", name, start, start - now_ts))
@@ -76,6 +91,7 @@ def check_codeforces():
         for contest in data.get("result", []):
             if contest.get("phase") != "BEFORE": continue
             name = contest.get("name", "Unknown contest")
+            if not is_rated_contest("Codeforces", name): continue
             start = contest.get("startTimeSeconds")
             if not start: continue
             for chat_id, info in users.items():
@@ -92,6 +108,7 @@ def check_codechef():
         now = datetime.now(timezone.utc)
         for contest in data.get("future_contests", []):
             name = contest.get("contest_name", "Unknown contest")
+            if not is_rated_contest("CodeChef", name): continue
             start_str = contest.get("contest_start_date_iso")
             if not start_str: continue
             start = datetime.fromisoformat(start_str.replace("Z", "+00:00"))
@@ -111,6 +128,7 @@ def check_leetcode():
         now = datetime.utcnow().timestamp()
         for contest in contests:
             name = contest.get("title", "Unknown contest")
+            if not is_rated_contest("LeetCode", name): continue
             start = contest.get("startTime")
             if start is None: continue
             for chat_id, info in users.items():
