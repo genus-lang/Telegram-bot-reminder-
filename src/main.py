@@ -6,6 +6,7 @@ from flask import Flask
 from src.config import BOT_TOKEN, CHECK_EVERY_SECONDS, executor
 from src.database import pending, pending_col, history_col
 from src.scrapers import check_codeforces, check_codechef, check_leetcode
+from src.timetable import check_lectures
 from src.handlers import process_message
 
 last_update_id = None
@@ -76,6 +77,7 @@ def main():
         check_codeforces()
         check_codechef()
         check_leetcode()
+        check_lectures()
         cleanup_pending()
         delete_expired_messages()
         print("Checked all platforms...")

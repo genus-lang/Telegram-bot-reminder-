@@ -46,6 +46,15 @@ def get_year_menu():
         "resize_keyboard": True
     }
 
+def get_group_menu():
+    return {
+        "keyboard": [
+            [{"text": "👥 Group 1"}, {"text": "👥 Group 2"}],
+            [{"text": "🔙 Back to Colleges"}]
+        ],
+        "resize_keyboard": True
+    }
+
 def get_lecture_reminder_menu():
     return {
         "keyboard": [
@@ -163,7 +172,13 @@ def process_message(update):
     elif text in ["🎓 Year 1", "🎓 Year 2", "🎓 Year 3", "🎓 Year 4"]:
         year = text.split(" ")[2]
         update_user_field(chat_id, "college_year", int(year))
-        send_message(chat_id, f"✅ <b>Year {year} selected!</b>\n\nWhen should I remind you about your scheduled lectures?", reply_markup=get_lecture_reminder_menu())
+        send_message(chat_id, f"✅ <b>Year {year} selected!</b>\n\nNow select your Group:", reply_markup=get_group_menu())
+        return
+        
+    elif text in ["👥 Group 1", "👥 Group 2"]:
+        group = text.split(" ")[2]
+        update_user_field(chat_id, "college_group", int(group))
+        send_message(chat_id, f"✅ <b>Group {group} selected!</b>\n\nWhen should I remind you about your scheduled lectures?", reply_markup=get_lecture_reminder_menu())
         return
         
     elif text in ["🔔 5 Min Before", "🔔 15 Min Before", "🔔 30 Min Before"]:
