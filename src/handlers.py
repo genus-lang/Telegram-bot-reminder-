@@ -29,8 +29,29 @@ def get_contest_menu():
 def get_college_menu():
     return {
         "keyboard": [
-            [{"text": "📚 Ask a College Question"}],
+            [{"text": "🏫 CSE"}, {"text": "⚙️ MAE"}],
+            [{"text": "📡 ECE"}, {"text": "🧮 MNC"}],
             [{"text": "🔙 Back to Main Menu"}]
+        ],
+        "resize_keyboard": True
+    }
+
+def get_year_menu():
+    return {
+        "keyboard": [
+            [{"text": "🎓 Year 1"}, {"text": "🎓 Year 2"}],
+            [{"text": "🎓 Year 3"}, {"text": "🎓 Year 4"}],
+            [{"text": "🔙 Back to Colleges"}]
+        ],
+        "resize_keyboard": True
+    }
+
+def get_lecture_reminder_menu():
+    return {
+        "keyboard": [
+            [{"text": "🔔 5 Min Before"}, {"text": "🔔 15 Min Before"}],
+            [{"text": "🔔 30 Min Before"}],
+            [{"text": "🔙 Back to Colleges"}]
         ],
         "resize_keyboard": True
     }
@@ -52,6 +73,12 @@ def set_active(chat_id):
     if users[chat_id].get("last_active") != today:
         users[chat_id]["last_active"] = today
         executor.submit(users_col.update_one, {"_id": chat_id}, {"$set": {"last_active": today}})
+
+def update_user_field(chat_id, field, value):
+    ensure_user(chat_id)
+    if users[chat_id].get(field) != value:
+        users[chat_id][field] = value
+        executor.submit(users_col.update_one, {"_id": chat_id}, {"$set": {field: value}})
 
 def update_reminder(chat_id, seconds):
     ensure_user(chat_id)
@@ -118,13 +145,31 @@ def process_message(update):
         send_message(chat_id, "🏆 <b>Contests Menu</b>\nSelect an option below:", reply_markup=get_contest_menu())
         return
     elif text == "🎓 Colleges":
-        send_message(chat_id, "🎓 <b>Colleges Menu</b>\nSelect an option below:", reply_markup=get_college_menu())
+        send_message(chat_id, "🎓 <b>Colleges Menu</b>\nSelect your branch:", reply_markup=get_college_menu())
         return
     elif text == "🔙 Back to Main Menu":
         send_message(chat_id, "🏠 <b>Main Menu</b>\nChoose a category:", reply_markup=get_main_menu())
         return
-    elif text == "📚 Ask a College Question":
-        send_message(chat_id, "🎓 <b>Ask away!</b> Just type any question about colleges and our AI will answer it.", reply_markup=get_college_menu())
+    elif text == "🔙 Back to Colleges":
+        send_message(chat_id, "🎓 <b>Colleges Menu</b>\nSelect your branch:", reply_markup=get_college_menu())
+        return
+        
+    elif text in ["🏫 CSE", "⚙️ MAE", "📡 ECE", "🧮 MNC"]:
+        branch = text.split(" ")[1]
+        update_user_field(chat_id, "college_branch", branch)
+        send_message(chat_id, f"✅ <b>Branch set to {branch}!</b>\n\nNow select your Year:", reply_markup=get_year_menu())
+        return
+        
+    elif text in ["🎓 Year 1", "🎓 Year 2", "🎓 Year 3", "🎓 Year 4"]:
+        year = text.split(" ")[2]
+        update_user_field(chat_id, "college_year", int(year))
+        send_message(chat_id, f"✅ <b>Year {year} selected!</b>\n\nWhen should I remind you about your scheduled lectures?", reply_markup=get_lecture_reminder_menu())
+        return
+        
+    elif text in ["🔔 5 Min Before", "🔔 15 Min Before", "🔔 30 Min Before"]:
+        minutes = int(text.split(" ")[1])
+        update_user_field(chat_id, "college_reminder", minutes * 60)
+        send_message(chat_id, f"🎉 <b>Setup Complete!</b>\n\nI will remind you exactly <b>{minutes} minutes</b> before your scheduled {users[chat_id].get('college_branch', 'College')} lectures begin!\n\n<i>(Note: Lecture timetable synchronization feature coming soon!)</i>", reply_markup=get_main_menu())
         return
     elif text == "⏰ 15 Min": text = "/15"
     elif text == "⏰ 30 Min": text = "/30"
