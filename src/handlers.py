@@ -10,6 +10,31 @@ from src.telegram import send_message, send_chat_action, schedule_delete
 from src.utils import extract_keywords, format_countdown, escape_html
 from src.scrapers import fetch_upcoming_contests
 
+def get_main_menu():
+    return {
+        "keyboard": [[{"text": "🏆 Contests"}, {"text": "🎓 Colleges"}]],
+        "resize_keyboard": True
+    }
+
+def get_contest_menu():
+    return {
+        "keyboard": [
+            [{"text": "⏰ 15 Min"}, {"text": "⏰ 30 Min"}, {"text": "⏰ 60 Min"}],
+            [{"text": "📅 Upcoming Contests"}],
+            [{"text": "🔙 Back to Main Menu"}]
+        ],
+        "resize_keyboard": True
+    }
+
+def get_college_menu():
+    return {
+        "keyboard": [
+            [{"text": "📚 Ask a College Question"}],
+            [{"text": "🔙 Back to Main Menu"}]
+        ],
+        "resize_keyboard": True
+    }
+
 def ensure_user(chat_id):
     if chat_id not in users:
         new_data = {
@@ -88,6 +113,24 @@ def process_message(update):
     if not text: return
     set_active(chat_id)
 
+    # UX Menu Overrides
+    if text == "🏆 Contests":
+        send_message(chat_id, "🏆 <b>Contests Menu</b>\nSelect an option below:", reply_markup=get_contest_menu())
+        return
+    elif text == "🎓 Colleges":
+        send_message(chat_id, "🎓 <b>Colleges Menu</b>\nSelect an option below:", reply_markup=get_college_menu())
+        return
+    elif text == "🔙 Back to Main Menu":
+        send_message(chat_id, "🏠 <b>Main Menu</b>\nChoose a category:", reply_markup=get_main_menu())
+        return
+    elif text == "📚 Ask a College Question":
+        send_message(chat_id, "🎓 <b>Ask away!</b> Just type any question about colleges and our AI will answer it.", reply_markup=get_college_menu())
+        return
+    elif text == "⏰ 15 Min": text = "/15"
+    elif text == "⏰ 30 Min": text = "/30"
+    elif text == "⏰ 60 Min": text = "/60"
+    elif text == "📅 Upcoming Contests": text = "/next"
+
     if chat_id == ADMIN_CHAT_ID and msg.get("reply_to_message"):
         replied_msg_id = str(msg["reply_to_message"]["message_id"])
         if replied_msg_id in pending:
@@ -134,20 +177,10 @@ def process_message(update):
     elif text == "/start":
         ensure_user(chat_id)
         welcome = (
-            "<b>👋 Welcome to the Contest Alert & AI Assistant!</b>\n\n"
-            "<b>🔔 Reminders:</b>\n"
-            "/15  → Alert 15 mins before\n"
-            "/30  → Alert 30 mins before\n"
-            "/60  → Alert 1 hour before\n\n"
-            "<b>🗓 Live Data:</b>\n"
-            "/next  → View upcoming contests\n\n"
-            "💬 <i>Or just type any question, and I'll find the answer!</i>"
+            "<b>👋 Welcome to the Bot Assistant!</b>\n\n"
+            "Use the buttons below to magically setup your push notifications, view live contests, or explore Colleges!"
         )
-        if chat_id == ADMIN_CHAT_ID:
-            welcome += "\n\n<b>🔐 Admin Commands:</b>\n/stats → Bot stats\n/announce &lt;msg&gt; → Broadcast\n/add_announcer &lt;id&gt; → Add mod\n/remove_announcer &lt;id&gt; → Remove mod\n/announcers → List mods"
-        elif chat_id in announcers:
-            welcome += "\n\n<b>📢 Announcer Commands:</b>\n/announce &lt;msg&gt; → Broadcast message"
-        send_message(chat_id, welcome)
+        send_message(chat_id, welcome, reply_markup=get_main_menu())
 
     elif text == "/15":
         update_reminder(chat_id, 900)

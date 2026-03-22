@@ -1,5 +1,6 @@
 import requests
 import time
+import json
 from src.config import BOT_TOKEN, ADMIN_CHAT_ID, executor
 from src.database import history_col
 
@@ -11,11 +12,13 @@ def schedule_delete(chat_id, message_id, delay_seconds=21600):
         "delete_at": time.time() + delay_seconds
     })
 
-def send_message(chat_id, text, auto_delete=True, parse_mode="HTML"):
+def send_message(chat_id, text, auto_delete=True, parse_mode="HTML", reply_markup=None):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     payload = {"chat_id": chat_id, "text": text}
     if parse_mode:
         payload["parse_mode"] = parse_mode
+    if reply_markup is not None:
+        payload["reply_markup"] = json.dumps(reply_markup)
     try:
         resp = requests.post(url, data=payload, timeout=10).json()
         if resp.get("ok"):
@@ -43,8 +46,8 @@ def send_photo(chat_id, photo_url, caption="", auto_delete=True, parse_mode="HTM
         pass
     return None
 
-def send_message_get_id(chat_id, text, auto_delete=True, parse_mode="HTML"):
-    return send_message(chat_id, text, auto_delete, parse_mode)
+def send_message_get_id(chat_id, text, auto_delete=True, parse_mode="HTML", reply_markup=None):
+    return send_message(chat_id, text, auto_delete, parse_mode, reply_markup)
 
 def send_chat_action(chat_id, action="typing"):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendChatAction"
