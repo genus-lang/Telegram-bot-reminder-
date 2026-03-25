@@ -96,6 +96,7 @@ def check_codeforces():
             if not start: continue
             for chat_id, info in users.items():
                 reminder = int(info.get("reminder", DEFAULT_REMINDER))
+                if reminder <= 0: continue
                 time_left = start - now
                 if 0 < time_left <= reminder:
                     maybe_send(chat_id, "Codeforces", name, time_left)
@@ -114,6 +115,7 @@ def check_codechef():
             time_left = (start - now).total_seconds()
             for chat_id, info in users.items():
                 reminder = int(info.get("reminder", DEFAULT_REMINDER))
+                if reminder <= 0: continue
                 if 0 < time_left <= reminder:
                     maybe_send(chat_id, "CodeChef", name, time_left)
     except: pass
@@ -131,7 +133,49 @@ def check_leetcode():
             if start is None: continue
             for chat_id, info in users.items():
                 reminder = int(info.get("reminder", DEFAULT_REMINDER))
+                if reminder <= 0: continue
                 time_left = start - now
                 if 0 < time_left <= reminder:
                     maybe_send(chat_id, "LeetCode", name, time_left)
     except: pass
+
+def fetch_daily_challenge():
+    """Fetch LeetCode's Daily Coding Challenge question."""
+    try:
+        url = "https://leetcode.com/graphql"
+        query = {
+            "query": """
+            {
+                activeDailyCodingChallengeQuestion {
+                    date
+                    link
+                    question {
+                        title
+                        difficulty
+                        topicTags { name }
+                        acRate
+                        frontendQuestionId: questionFrontendId
+                    }
+                }
+            }
+            """
+        }
+        headers = {"Content-Type": "application/json"}
+        res = requests.post(url, json=query, headers=headers, timeout=15).json()
+        data = res.get("data", {}).get("activeDailyCodingChallengeQuestion", {})
+        if not data:
+            return None
+        
+        q = data.get("question", {})
+        return {
+            "date": data.get("date", ""),
+            "title": q.get("title", "Unknown"),
+            "difficulty": q.get("difficulty", "Unknown"),
+            "id": q.get("frontendQuestionId", "?"),
+            "acceptance": round(q.get("acRate", 0), 1),
+            "tags": [t["name"] for t in q.get("topicTags", [])[:5]],
+            "url": f"https://leetcode.com{data.get('link', '')}"
+        }
+    except:
+        return None
+

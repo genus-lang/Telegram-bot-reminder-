@@ -8,7 +8,7 @@ from src.database import (
 )
 from src.telegram import send_message, send_chat_action, schedule_delete
 from src.utils import extract_keywords, format_countdown, escape_html
-from src.scrapers import fetch_upcoming_contests
+from src.scrapers import fetch_upcoming_contests, fetch_daily_challenge
 
 def get_main_menu():
     return {
@@ -16,11 +16,22 @@ def get_main_menu():
         "resize_keyboard": True
     }
 
+def get_admin_menu():
+    return {
+        "keyboard": [
+            [{"text": "📊 Stats"}, {"text": "📢 Broadcast"}],
+            [{"text": "👥 Announcers"}, {"text": "🔍 Pending Questions"}],
+            [{"text": "🏆 Contests"}, {"text": "🎓 Colleges"}]
+        ],
+        "resize_keyboard": True
+    }
+
 def get_contest_menu():
     return {
         "keyboard": [
             [{"text": "⏰ 15 Min"}, {"text": "⏰ 30 Min"}, {"text": "⏰ 60 Min"}],
-            [{"text": "📅 Upcoming Contests"}],
+            [{"text": "📅 Upcoming Contests"}, {"text": "💡 Daily Challenge"}],
+            [{"text": "🔕 Turn Off Contest Alerts"}],
             [{"text": "🔙 Back to Main Menu"}]
         ],
         "resize_keyboard": True
@@ -59,7 +70,7 @@ def get_lecture_reminder_menu():
     return {
         "keyboard": [
             [{"text": "🔔 5 Min Before"}, {"text": "🔔 15 Min Before"}],
-            [{"text": "🔔 30 Min Before"}],
+            [{"text": "🔔 30 Min Before"}, {"text": "🔕 Turn Off Reminders"}],
             [{"text": "🔙 Back to Colleges"}]
         ],
         "resize_keyboard": True
@@ -150,7 +161,26 @@ def process_message(update):
     set_active(chat_id)
 
     # UX Menu Overrides - Safe Substring Matching
-    if "Upcoming Contests" in text:
+    if "Daily Challenge" in text:
+        send_message(chat_id, "💡 <i>Fetching today's coding challenge...</i>")
+        challenge = fetch_daily_challenge()
+        if challenge:
+            diff = challenge['difficulty']
+            diff_emoji = {"Easy": "🟢", "Medium": "🟡", "Hard": "🔴"}.get(diff, "⚪")
+            tags_str = ", ".join(challenge['tags'][:5]) if challenge['tags'] else "—"
+            msg = (
+                f"💡 <b>Daily Coding Challenge</b>\n\n"
+                f"🆔 <b>#{challenge['id']}</b> | {diff_emoji} <b>{diff}</b>\n"
+                f"📝 <b>{escape_html(challenge['title'])}</b>\n\n"
+                f"✅ <b>Acceptance:</b> {challenge['acceptance']}%\n"
+                f"🏷️ <b>Tags:</b> <i>{escape_html(tags_str)}</i>\n\n"
+                f"🔗 <a href=\"{challenge['url']}\">Solve on LeetCode</a>"
+            )
+            send_message(chat_id, msg)
+        else:
+            send_message(chat_id, "❌ <i>Could not fetch today's challenge. Try again later!</i>")
+        return
+    elif "Upcoming Contests" in text:
         text = "/next"
     elif "Contests Menu" in text:
         return
@@ -163,7 +193,8 @@ def process_message(update):
         send_message(chat_id, "🎓 <b>Colleges Menu</b>\nSelect your branch:", reply_markup=get_college_menu())
         return
     elif "Main Menu" in text:
-        send_message(chat_id, "🏠 <b>Main Menu</b>\nChoose a category:", reply_markup=get_main_menu())
+        menu = get_admin_menu() if chat_id == ADMIN_CHAT_ID else get_main_menu()
+        send_message(chat_id, "🏠 <b>Main Menu</b>\nChoose a category:", reply_markup=menu)
         return
     elif "Back to Colleges" in text:
         send_message(chat_id, "🎓 <b>Colleges Menu</b>\nSelect your branch:", reply_markup=get_college_menu())
@@ -187,10 +218,20 @@ def process_message(update):
         send_message(chat_id, f"✅ <b>Group {group} selected!</b>\n\nWhen should I remind you about your scheduled lectures?", reply_markup=get_lecture_reminder_menu())
         return
         
-    elif "Before" in text and any(m in text for m in ["5 Min", "15 Min", "30 Min"]):
-        minutes = int(next(m.split(" ")[0] for m in ["5 Min", "15 Min", "30 Min"] if m in text))
+    elif "Before" in text and any(m in text for m in ["15 Min", "30 Min", "5 Min"]):
+        minutes = int(next(m.split(" ")[0] for m in ["15 Min", "30 Min", "5 Min"] if m in text))
         update_user_field(chat_id, "college_reminder", minutes * 60)
         send_message(chat_id, f"🎉 <b>Setup Complete!</b>\n\nI will remind you exactly <b>{minutes} minutes</b> before your scheduled {users[chat_id].get('college_branch', 'College')} lectures begin!", reply_markup=get_main_menu())
+        return
+
+    elif "Turn Off Reminders" in text:
+        update_user_field(chat_id, "college_reminder", 0)
+        send_message(chat_id, "🔕 <b>College Reminders Disabled!</b>\n\nYou will no longer receive notifications for lectures. Contest alerts remain active.\n\n<i>To re-enable, go to Colleges and set up again.</i>", reply_markup=get_main_menu() if chat_id != ADMIN_CHAT_ID else get_admin_menu())
+        return
+
+    elif "Turn Off Contest" in text:
+        update_reminder(chat_id, 0)
+        send_message(chat_id, "🔕 <b>Contest Alerts Disabled!</b>\n\nYou will no longer receive contest reminders. College lecture alerts remain active.\n\n<i>To re-enable, go to Contests and pick a time.</i>", reply_markup=get_main_menu() if chat_id != ADMIN_CHAT_ID else get_admin_menu())
         return
         
     elif "15 Min" in text: text = "/15"
@@ -242,11 +283,57 @@ def process_message(update):
 
     elif text == "/start":
         ensure_user(chat_id)
-        welcome = (
-            "<b>👋 Welcome to the Bot Assistant!</b>\n\n"
-            "Use the buttons below to magically setup your push notifications, view live contests, or explore Colleges!"
-        )
-        send_message(chat_id, welcome, reply_markup=get_main_menu())
+        if chat_id == ADMIN_CHAT_ID:
+            welcome = (
+                "🔧 <b>Admin Control Panel</b>\n\n"
+                "Use the buttons below to manage the bot, view stats, or broadcast messages."
+            )
+            send_message(chat_id, welcome, reply_markup=get_admin_menu())
+        else:
+            welcome = (
+                "<b>👋 Welcome to the Bot Assistant!</b>\n\n"
+                "Use the buttons below to setup push notifications, view live contests, or explore Colleges!"
+            )
+            send_message(chat_id, welcome, reply_markup=get_main_menu())
+
+    elif "Stats" in text and chat_id == ADMIN_CHAT_ID:
+        total, active, most = get_stats()
+        time_map = {900: "15 min", 1800: "30 min", 3600: "1 hour", 0: "Off"}
+        # Count college reminder users
+        college_users = sum(1 for u in users.values() if u.get("college_reminder", 0) > 0)
+        contest_users = sum(1 for u in users.values() if u.get("reminder", 0) > 0)
+        send_message(chat_id, 
+            f"📊 <b>Bot Statistics</b>\n\n"
+            f"👥 <b>Total Users:</b> <code>{total}</code>\n"
+            f"🔥 <b>Active Today:</b> <code>{active}</code>\n"
+            f"⏰ <b>Most Used Reminder:</b> <code>{time_map.get(most, '30 min')}</code>\n\n"
+            f"<b>🏆 Contest Alerts Active:</b> <code>{contest_users}</code>\n"
+            f"<b>🎓 College Alerts Active:</b> <code>{college_users}</code>")
+        return
+
+    elif "Broadcast" in text and chat_id == ADMIN_CHAT_ID:
+        send_message(chat_id, "📢 <b>Broadcast Mode</b>\n\nType your message as:\n<code>/announce Your message here</code>\n\nThis will be sent to all users.", reply_markup=get_admin_menu())
+        return
+
+    elif "Announcers" in text and chat_id == ADMIN_CHAT_ID:
+        ann_list = "\n".join([f"🔸 <code>{a}</code> {'<i>(Admin)</i>' if a == ADMIN_CHAT_ID else ''}" for a in announcers])
+        send_message(chat_id, 
+            f"📢 <b>Authorized Announcers:</b>\n{ann_list}\n\n"
+            f"<b>Commands:</b>\n"
+            f"<code>/add_announcer CHAT_ID</code>\n"
+            f"<code>/remove_announcer CHAT_ID</code>", reply_markup=get_admin_menu())
+        return
+
+    elif "Pending" in text and chat_id == ADMIN_CHAT_ID:
+        if not pending:
+            send_message(chat_id, "✅ <b>No pending questions!</b>\n\nAll user questions have been answered.", reply_markup=get_admin_menu())
+        else:
+            lines = [f"📥 <b>Pending Questions ({len(pending)})</b>\n"]
+            for msg_id, entry in list(pending.items())[:10]:
+                q = escape_html(entry.get('question', '?')[:50])
+                lines.append(f"💬 <i>\"{q}\"</i>\n   from <code>{entry.get('chat_id', '?')}</code>")
+            send_message(chat_id, "\n".join(lines), reply_markup=get_admin_menu())
+        return
 
     elif text == "/15":
         update_reminder(chat_id, 900)

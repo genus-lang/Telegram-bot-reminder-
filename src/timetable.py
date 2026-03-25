@@ -1,87 +1,15 @@
 from datetime import datetime, timezone, timedelta
-from src.database import users, sent, sent_col
+from src.database import users, sent, sent_col, db
 from src.config import executor
 from src.telegram import send_message
 from src.utils import escape_html
 
-TIMETABLE = {
-    "CSE": {
-        3: {
-            1: {
-                "Monday": [
-                    {"start": "09:00", "end": "10:00", "subject": "CS304 (Compiler)", "faculty": "—", "room": "C101"},
-                    {"start": "10:00", "end": "11:00", "subject": "Data Mining", "faculty": "—", "room": "—"},
-                    {"start": "11:00", "end": "12:00", "subject": "CS304", "faculty": "—", "room": "C201"},
-                    {"start": "12:00", "end": "13:00", "subject": "ME306 (EVS)", "faculty": "—", "room": "C101"},
-                    {"start": "16:00", "end": "18:00", "subject": "CS313 (Networks Lab)", "faculty": "SKR", "room": "CC Floor"}
-                ],
-                "Tuesday": [
-                    {"start": "11:00", "end": "12:00", "subject": "CS305 (CN)", "faculty": "SKR", "room": "C101"},
-                    {"start": "12:00", "end": "13:00", "subject": "ME306", "faculty": "VJK", "room": "C101"},
-                    {"start": "15:00", "end": "16:00", "subject": "CS304", "faculty": "—", "room": "C101"}
-                ],
-                "Wednesday": [
-                    {"start": "10:00", "end": "11:00", "subject": "CS305", "faculty": "SKR", "room": "C101"},
-                    {"start": "11:00", "end": "12:00", "subject": "CS351 (Crypto)", "faculty": "HN", "room": "C201"},
-                    {"start": "12:00", "end": "13:00", "subject": "CS306 (Graphics)", "faculty": "—", "room": "C101"},
-                    {"start": "13:00", "end": "14:00", "subject": "CS305", "faculty": "SKR", "room": "C201"},
-                    {"start": "15:00", "end": "16:00", "subject": "CS304", "faculty": "—", "room": "C101"}
-                ],
-                "Thursday": [
-                    {"start": "10:00", "end": "11:00", "subject": "CS351", "faculty": "HN", "room": "C201"},
-                    {"start": "11:00", "end": "12:00", "subject": "CS306", "faculty": "—", "room": "C101"},
-                    {"start": "12:00", "end": "13:00", "subject": "CS306", "faculty": "—", "room": "C101"},
-                    {"start": "13:00", "end": "14:00", "subject": "Data Mining", "faculty": "—", "room": "—"},
-                    {"start": "16:00", "end": "18:00", "subject": "CS314 (ML Lab)", "faculty": "TM", "room": "CC Floor"}
-                ],
-                "Friday": [
-                    {"start": "09:00", "end": "10:00", "subject": "CS307 (ML)", "faculty": "—", "room": "—"},
-                    {"start": "10:00", "end": "11:00", "subject": "CS306", "faculty": "—", "room": "C101"},
-                    {"start": "11:00", "end": "12:00", "subject": "CS304", "faculty": "—", "room": "C101"},
-                    {"start": "15:00", "end": "16:00", "subject": "CS305", "faculty": "SKR", "room": "C101"}
-                ]
-            },
-            2: {
-                "Monday": [
-                    {"start": "09:00", "end": "10:00", "subject": "CS307 (ML)", "faculty": "—", "room": "—"},
-                    {"start": "10:00", "end": "11:00", "subject": "CS351", "faculty": "HN", "room": "C201"},
-                    {"start": "11:00", "end": "12:00", "subject": "CS304", "faculty": "—", "room": "C201"},
-                    {"start": "12:00", "end": "13:00", "subject": "ME306", "faculty": "VJK", "room": "C201"},
-                    {"start": "16:00", "end": "18:00", "subject": "CS313 Lab", "faculty": "SKR", "room": "CC Floor"}
-                ],
-                "Tuesday": [
-                    {"start": "11:00", "end": "12:00", "subject": "CS307 (ML)", "faculty": "—", "room": "—"},
-                    {"start": "12:00", "end": "13:00", "subject": "ME306", "faculty": "VJK", "room": "C201"},
-                    {"start": "13:00", "end": "14:00", "subject": "CS305", "faculty": "SKR", "room": "C201"},
-                    {"start": "17:00", "end": "18:00", "subject": "CS306", "faculty": "—", "room": "—"}
-                ],
-                "Wednesday": [
-                    {"start": "10:00", "end": "11:00", "subject": "Data Mining", "faculty": "—", "room": "—"},
-                    {"start": "11:00", "end": "12:00", "subject": "CS304", "faculty": "—", "room": "C201"},
-                    {"start": "12:00", "end": "13:00", "subject": "CS306", "faculty": "—", "room": "C201"},
-                    {"start": "13:00", "end": "14:00", "subject": "CS305", "faculty": "SKR", "room": "C201"},
-                    {"start": "16:00", "end": "18:00", "subject": "CS312 (Compiler Lab)", "faculty": "—", "room": "CC Floor"}
-                ],
-                "Thursday": [
-                    {"start": "10:00", "end": "11:00", "subject": "CS351", "faculty": "HN", "room": "C201"},
-                    {"start": "11:00", "end": "12:00", "subject": "CS306", "faculty": "—", "room": "C201"},
-                    {"start": "12:00", "end": "13:00", "subject": "CS306", "faculty": "—", "room": "C201"},
-                    {"start": "13:00", "end": "14:00", "subject": "Data Mining", "faculty": "—", "room": "—"},
-                    {"start": "16:00", "end": "18:00", "subject": "CS533 (ML Lab)", "faculty": "TM", "room": "CC Floor"}
-                ],
-                "Friday": [
-                    {"start": "09:00", "end": "10:00", "subject": "CS307", "faculty": "—", "room": "—"},
-                    {"start": "10:00", "end": "11:00", "subject": "CS306", "faculty": "—", "room": "C201"},
-                    {"start": "11:00", "end": "12:00", "subject": "CS304", "faculty": "—", "room": "C201"},
-                    {"start": "17:00", "end": "18:00", "subject": "CS305", "faculty": "SKR", "room": "C201"}
-                ]
-            }
-        }
-    }
-}
+timetable_col = db["timetable"]
+timetable_cache = {}
 
 def check_lectures():
     try:
+        global timetable_cache
         ist_tz = timezone(timedelta(hours=5, minutes=30))
         now = datetime.now(ist_tz)
         day_name = now.strftime("%A")
@@ -94,11 +22,23 @@ def check_lectures():
             
             if not (branch and year and group and reminder_seconds):
                 continue
+            if reminder_seconds <= 0:
+                continue
                 
             try:
-                # If we don't have the user's specific branch/year table yet, it safely skips
-                schedule = TIMETABLE[branch][year][group].get(day_name, [])
-            except KeyError:
+                doc_id = f"{branch}_Year{year}"
+                
+                # Fetch entirely from safe RAM lookup mapping
+                if doc_id not in timetable_cache:
+                    doc = timetable_col.find_one({"_id": doc_id})
+                    timetable_cache[doc_id] = doc if doc else {}
+                    
+                cached_doc = timetable_cache[doc_id]
+                if not cached_doc: continue
+                
+                # Extract strict nested target string routes manually
+                schedule = cached_doc.get("groups", {}).get(str(group), {}).get(day_name, [])
+            except Exception:
                 continue
                 
             for lecture in schedule:
