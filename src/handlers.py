@@ -26,6 +26,15 @@ def get_admin_menu():
         "resize_keyboard": True
     }
 
+def get_announcer_menu():
+    return {
+        "keyboard": [
+            [{"text": "📢 Announce"}],
+            [{"text": "🏆 Contests"}, {"text": "🎓 Colleges"}]
+        ],
+        "resize_keyboard": True
+    }
+
 def get_contest_menu():
     return {
         "keyboard": [
@@ -150,6 +159,9 @@ def broadcast_announcement(msg_to_send, chat_id):
         time.sleep(0.05)
     send_message(chat_id, f"✅ <b>Broadcast complete:</b> Sent to <code>{success_count}</code> users.")
 
+# Track announcers waiting to send a message
+_announcer_pending = set()
+
 def process_message(update):
     msg = update.get("message")
     if not msg: return
@@ -159,6 +171,15 @@ def process_message(update):
     text = msg.get("text", "").strip()
     if not text: return
     set_active(chat_id)
+
+    # Handle announcers who clicked the 📢 Announce button and are now typing their message
+    if chat_id in _announcer_pending and not text.startswith("/"):
+        _announcer_pending.discard(chat_id)
+        if not text:
+            send_message(chat_id, "⚠️ <i>Empty message — announcement cancelled.</i>", reply_markup=get_announcer_menu())
+            return
+        threading.Thread(target=broadcast_announcement, args=(text, chat_id), daemon=True).start()
+        return
 
     # UX Menu Overrides - Safe Substring Matching
     if "Daily Challenge" in text:
@@ -259,12 +280,35 @@ def process_message(update):
         threading.Thread(target=broadcast_announcement, args=(msg_to_send, chat_id), daemon=True).start()
         return
 
+    elif text == "📢 Announce" and chat_id in announcers:
+        _announcer_pending.add(chat_id)
+        send_message(chat_id,
+            "📢 <b>Announce to All Users</b>\n\n"
+            "Type your announcement message below and send it.\n"
+            "<i>It will be broadcast to all bot users.</i>\n\n"
+            "Send /cancel to abort.",
+            reply_markup={"keyboard": [[{"text": "/cancel"}]], "resize_keyboard": True}
+        )
+        return
+
+    elif text == "/cancel" and chat_id in _announcer_pending:
+        _announcer_pending.discard(chat_id)
+        send_message(chat_id, "❌ <i>Announcement cancelled.</i>", reply_markup=get_announcer_menu())
+        return
+
     elif text.startswith("/add_announcer ") and chat_id == ADMIN_CHAT_ID:
         new_id = text[len("/add_announcer "):].strip()
         if new_id and new_id not in announcers:
             announcers.add(new_id)
             executor.submit(announcers_col.insert_one, {"_id": new_id})
-            send_message(chat_id, f"✅ User <code>{new_id}</code> can now safely /announce.")
+            send_message(chat_id, f"✅ User <code>{new_id}</code> added as an announcer.")
+            # Notify the new announcer with their menu
+            send_message(new_id,
+                "📢 <b>You've been granted Announcer access!</b>\n\n"
+                "You can now broadcast messages to all bot users.\n"
+                "Tap <b>📢 Announce</b> below to get started.",
+                reply_markup=get_announcer_menu()
+            )
 
     elif text.startswith("/remove_announcer ") and chat_id == ADMIN_CHAT_ID:
         rem_id = text[len("/remove_announcer "):].strip()
@@ -289,6 +333,12 @@ def process_message(update):
                 "Use the buttons below to manage the bot, view stats, or broadcast messages."
             )
             send_message(chat_id, welcome, reply_markup=get_admin_menu())
+        elif chat_id in announcers:
+            welcome = (
+                "📢 <b>Announcer Panel</b>\n\n"
+                "You have announcer privileges. Use <b>📢 Announce</b> to broadcast a message to all users."
+            )
+            send_message(chat_id, welcome, reply_markup=get_announcer_menu())
         else:
             welcome = (
                 "<b>👋 Welcome to the Bot Assistant!</b>\n\n"
