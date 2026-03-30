@@ -67,13 +67,8 @@ def delete_expired_messages():
     for doc in expired:
         executor.submit(delete_telegram_message, doc["chat_id"], doc["message_id"], doc["_id"])
 
-def main():
-    print("Starting Flask Keep-Alive Server...")
-    threading.Thread(target=run_server, daemon=True).start()
-    
-    print("Bot is running...")
+def background_jobs():
     while True:
-        handle_updates()
         check_codeforces()
         check_codechef()
         check_leetcode()
@@ -82,6 +77,20 @@ def main():
         delete_expired_messages()
         print("Checked all platforms...")
         time.sleep(CHECK_EVERY_SECONDS)
+
+def main():
+    print("Starting Flask Keep-Alive Server...")
+    threading.Thread(target=run_server, daemon=True).start()
+    
+    print("Starting Background Jobs...")
+    threading.Thread(target=background_jobs, daemon=True).start()
+    
+    print("Bot is running...")
+    while True:
+        handle_updates()
+        # Sleep for a tiny fraction just to prevent 100% CPU on fast iteration,
+        # but the request itself blocks for 10s if there's no message due to long polling.
+        time.sleep(0.1)
 
 if __name__ == "__main__":
     main()
