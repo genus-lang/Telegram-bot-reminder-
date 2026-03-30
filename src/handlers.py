@@ -172,8 +172,22 @@ def process_message(update):
     if not text: return
     set_active(chat_id)
 
+    # --- Convert Natural Language to Commands ---
+    text_lower = text.lower()
+    if text_lower in ["cancel", "stop", "abort"]: text = "/cancel"
+    elif text_lower in ["announcers", "announcers list"]: text = "/announcers"
+    elif text_lower in ["start", "hello", "hi", "hey"]: text = "/start"
+    elif text_lower in ["stats", "statistics"]: text = "/stats"
+    elif text_lower in ["next", "upcoming", "upcoming contests"]: text = "/next"
+    elif text_lower in ["15", "15 min", "15 mins", "15 minutes"]: text = "/15"
+    elif text_lower in ["30", "30 min", "30 mins", "30 minutes"]: text = "/30"
+    elif text_lower in ["60", "60 min", "60 mins", "60 minutes", "1 hour"]: text = "/60"
+    elif text_lower.startswith("announce "): text = "/announce " + text[9:]
+    elif text_lower.startswith("add announcer "): text = "/add_announcer " + text[14:]
+    elif text_lower.startswith("remove announcer "): text = "/remove_announcer " + text[17:]
+
     # Handle announcers who clicked the 📢 Announce button and are now typing their message
-    if chat_id in _announcer_pending and not text.startswith("/"):
+    if chat_id in _announcer_pending and not (text.startswith("/") or text_lower == "cancel"):
         _announcer_pending.discard(chat_id)
         if not text:
             send_message(chat_id, "⚠️ <i>Empty message — announcement cancelled.</i>", reply_markup=get_announcer_menu())
