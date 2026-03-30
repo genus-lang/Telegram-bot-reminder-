@@ -4,7 +4,7 @@ from datetime import datetime, timezone, timedelta
 from src.config import ADMIN_CHAT_ID, MATCH_THRESHOLD, DEFAULT_REMINDER, executor
 from src.database import (
     users, users_col, pending, pending_col,
-    knowledge, knowledge_col, announcers, announcers_col
+    knowledge, knowledge_col, announcers, announcers_col, timetable_col
 )
 from src.telegram import send_message, send_chat_action, schedule_delete
 from src.utils import extract_keywords, format_countdown, escape_html
@@ -230,7 +230,15 @@ def process_message(update):
     elif any(y in text for y in ["Year 1", "Year 2", "Year 3", "Year 4"]):
         year = next(y.split(" ")[1] for y in ["Year 1", "Year 2", "Year 3", "Year 4"] if y in text)
         update_user_field(chat_id, "college_year", int(year))
-        send_message(chat_id, f"✅ <b>Year {year} selected!</b>\n\nNow select your Group:", reply_markup=get_group_menu())
+        branch = users[chat_id].get("college_branch", "")
+        doc_id = f"{branch}_Year{year}"
+        doc = timetable_col.find_one({"_id": doc_id})
+        has_groups = doc.get("has_groups", True) if doc else True
+        if has_groups:
+            send_message(chat_id, f"✅ <b>Year {year} selected!</b>\n\nNow select your Group:", reply_markup=get_group_menu())
+        else:
+            update_user_field(chat_id, "college_group", 0)
+            send_message(chat_id, f"✅ <b>Year {year} selected!</b>\n\nWhen should I remind you about your scheduled lectures?", reply_markup=get_lecture_reminder_menu())
         return
         
     elif any(g in text for g in ["Group 1", "Group 2"]):

@@ -1,10 +1,8 @@
 from datetime import datetime, timezone, timedelta
-from src.database import users, sent, sent_col, db
+from src.database import users, sent, sent_col, timetable_col
 from src.config import executor
 from src.telegram import send_message
 from src.utils import escape_html
-
-timetable_col = db["timetable"]
 timetable_cache = {}
 
 def check_lectures():
@@ -20,7 +18,7 @@ def check_lectures():
             group = info.get("college_group")
             reminder_seconds = info.get("college_reminder")
             
-            if not (branch and year and group and reminder_seconds):
+            if not branch or year is None or group is None or not reminder_seconds:
                 continue
             if reminder_seconds <= 0:
                 continue

@@ -12,6 +12,7 @@ pending_col = db["pending"]
 knowledge_col = db["knowledge"]
 announcers_col = db["announcers"]
 history_col = db["history"]
+timetable_col = db["timetable"]
 
 # ----------------- DB MIGRATION -----------------
 if users_col.count_documents({}) == 0:
