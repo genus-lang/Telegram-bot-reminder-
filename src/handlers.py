@@ -308,8 +308,8 @@ def process_message(update):
             "📢 <b>Announce to All Users</b>\n\n"
             "Type your announcement message below and send it.\n"
             "<i>It will be broadcast to all bot users.</i>\n\n"
-            "Send /cancel to abort.",
-            reply_markup={"keyboard": [[{"text": "/cancel"}]], "resize_keyboard": True}
+            "Send <b>Cancel</b> to abort.",
+            reply_markup={"keyboard": [[{"text": "Cancel"}]], "resize_keyboard": True}
         )
         return
 
@@ -384,7 +384,7 @@ def process_message(update):
         return
 
     elif "Broadcast" in text and chat_id == ADMIN_CHAT_ID:
-        send_message(chat_id, "📢 <b>Broadcast Mode</b>\n\nType your message as:\n<code>/announce Your message here</code>\n\nThis will be sent to all users.", reply_markup=get_admin_menu())
+        send_message(chat_id, "📢 <b>Broadcast Mode</b>\n\nType your message as:\n<code>announce Your message here</code>\n\nThis will be sent to all users.", reply_markup=get_admin_menu())
         return
 
     elif "Announcers" in text and chat_id == ADMIN_CHAT_ID:
@@ -392,8 +392,8 @@ def process_message(update):
         send_message(chat_id, 
             f"📢 <b>Authorized Announcers:</b>\n{ann_list}\n\n"
             f"<b>Commands:</b>\n"
-            f"<code>/add_announcer CHAT_ID</code>\n"
-            f"<code>/remove_announcer CHAT_ID</code>", reply_markup=get_admin_menu())
+            f"<code>add announcer CHAT_ID</code>\n"
+            f"<code>remove announcer CHAT_ID</code>", reply_markup=get_admin_menu())
         return
 
     elif "Pending" in text and chat_id == ADMIN_CHAT_ID:
