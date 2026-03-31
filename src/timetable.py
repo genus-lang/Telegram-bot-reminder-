@@ -63,6 +63,16 @@ def check_lectures():
                             f"👨‍🏫 <b>Faculty:</b> {prof}\n\n"
                             f"⏳ Starts in about <b>{mins if mins > 0 else 1} minutes</b>!"
                         )
-                        executor.submit(send_message, chat_id, msg)
+                        
+                        safe_cb_sub = lecture['subject'][:40]
+                        markup = {
+                            "inline_keyboard": [
+                                [
+                                    {"text": "✅ Attending", "callback_data": f"att_y_{safe_cb_sub}"},
+                                    {"text": "❌ Bunking", "callback_data": f"att_n_{safe_cb_sub}"}
+                                ]
+                            ]
+                        }
+                        executor.submit(send_message, chat_id, msg, reply_markup=markup)
     except:
         pass

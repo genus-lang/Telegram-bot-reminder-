@@ -4,9 +4,9 @@ from datetime import datetime, timezone, timedelta
 from src.config import ADMIN_CHAT_ID, MATCH_THRESHOLD, DEFAULT_REMINDER, executor
 from src.database import (
     users, users_col, pending, pending_col,
-    knowledge, knowledge_col, announcers, announcers_col, timetable_col
+    knowledge, knowledge_col, announcers, announcers_col, timetable_col, attendance, attendance_col
 )
-from src.telegram import send_message, send_chat_action, schedule_delete
+from src.telegram import send_message, send_chat_action, schedule_delete, answer_callback_query, edit_message_text
 from src.utils import extract_keywords, format_countdown, escape_html
 from src.scrapers import fetch_upcoming_contests, fetch_daily_challenge
 
@@ -165,7 +165,53 @@ def broadcast_announcement(msg_to_send, chat_id):
 # Track announcers waiting to send a message
 _announcer_pending = set()
 
+def handle_callback(query):
+    query_id = query["id"]
+    chat_id = str(query["message"]["chat"]["id"])
+    msg_id = query["message"]["message_id"]
+    data = query["data"]
+    
+    if data.startswith("att_y_") or data.startswith("att_n_"):
+        is_attending = data.startswith("att_y_")
+        subject = data[6:]
+        record_id = f"{chat_id}|{subject}"
+        ensure_user(chat_id)
+        
+        if record_id not in attendance:
+            attendance[record_id] = {"_id": record_id, "attended": 0, "bunked": 0}
+            
+        rec = attendance[record_id]
+        if is_attending:
+            rec["attended"] += 1
+            op = {"$inc": {"attended": 1}}
+            action_text = "✅ <i>You marked: Attending</i>"
+            answer_text = "✅ Marked as Attending!"
+        else:
+            rec["bunked"] += 1
+            op = {"$inc": {"bunked": 1}}
+            action_text = "❌ <i>You marked: Bunking</i>"
+            answer_text = "❌ Marked as Bunking!"
+            
+        executor.submit(attendance_col.update_one, {"_id": record_id}, op, upsert=True)
+        answer_callback_query(query_id, answer_text)
+        
+        total = rec["attended"] + rec["bunked"]
+        perc = (rec["attended"] / total) * 100 if total > 0 else 100
+        
+        # Determine color based on threshold
+        color = "🟢" if perc >= 75 else "🔴"
+        
+        orig_text = query["message"].get("text", "🏫 <b>Class Alert!</b>\n" + subject)
+        new_text = f"{orig_text}\n\n{action_text}\n{color} <b>Attendance:</b> {perc:.1f}%"
+        edit_message_text(chat_id, msg_id, new_text)
+        
+        if perc < 75:
+            send_message(chat_id, f"⚠️ <b>Attendance Warning!</b>\nYour attendance in <code>{escape_html(subject)}</code> just dropped to <b>{perc:.1f}%</b>. Carefull!")
+            
 def process_message(update):
+    if "callback_query" in update:
+        return handle_callback(update["callback_query"])
+
     msg = update.get("message")
     if not msg: return
     chat_id = str(msg["chat"]["id"])

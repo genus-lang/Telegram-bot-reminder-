@@ -58,3 +58,26 @@ def send_chat_action(chat_id, action="typing"):
         session.post(url, data={"chat_id": chat_id, "action": action}, timeout=5)
     except:
         pass
+
+def answer_callback_query(callback_query_id, text=None, show_alert=False):
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/answerCallbackQuery"
+    payload = {"callback_query_id": callback_query_id, "show_alert": show_alert}
+    if text: payload["text"] = text
+    try:
+        session.post(url, data=payload, timeout=5)
+    except:
+        pass
+
+def edit_message_text(chat_id, message_id, text, parse_mode="HTML", reply_markup=None):
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/editMessageText"
+    payload = {"chat_id": chat_id, "message_id": message_id, "text": text}
+    if parse_mode:
+        payload["parse_mode"] = parse_mode
+    if reply_markup is not None:
+        payload["reply_markup"] = json.dumps(reply_markup)
+    else:
+        payload["reply_markup"] = json.dumps({"inline_keyboard": []}) # clear buttons
+    try:
+        session.post(url, data=payload, timeout=5)
+    except:
+        pass

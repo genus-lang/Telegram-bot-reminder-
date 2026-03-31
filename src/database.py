@@ -13,6 +13,7 @@ knowledge_col = db["knowledge"]
 announcers_col = db["announcers"]
 history_col = db["history"]
 timetable_col = db["timetable"]
+attendance_col = db["attendance"]
 
 # ----------------- DB MIGRATION -----------------
 if users_col.count_documents({}) == 0:
@@ -54,6 +55,7 @@ pending = {doc["_id"]: doc for doc in pending_col.find()}
 sent = set(doc["_id"] for doc in sent_col.find())
 knowledge = list(knowledge_col.find())
 announcers = set(doc["_id"] for doc in announcers_col.find())
+attendance = {doc["_id"]: doc for doc in attendance_col.find()}
 
 if ADMIN_CHAT_ID and ADMIN_CHAT_ID not in announcers:
     announcers.add(ADMIN_CHAT_ID)

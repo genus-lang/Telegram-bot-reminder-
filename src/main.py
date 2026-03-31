@@ -68,7 +68,17 @@ def delete_expired_messages():
         executor.submit(delete_telegram_message, doc["chat_id"], doc["message_id"], doc["_id"])
 
 def background_jobs():
+    last_digest_date = None
     while True:
+        try:
+            now_ist = datetime.now(timezone(timedelta(hours=5, minutes=30)))
+            if now_ist.hour >= 8 and last_digest_date != now_ist.date():
+                from src.digests import send_morning_digests
+                send_morning_digests()
+                last_digest_date = now_ist.date()
+        except:
+            pass
+
         check_codeforces()
         check_codechef()
         check_leetcode()
