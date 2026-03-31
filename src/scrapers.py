@@ -20,43 +20,58 @@ def is_rated_contest(platform, name):
 def fetch_upcoming_contests():
     contests = []
     now_ts = datetime.now(timezone.utc).timestamp()
+    import threading
     
-    try:
-        url = "https://codeforces.com/api/contest.list"
-        data = requests.get(url, timeout=15).json()
-        for c in data.get("result", []):
-            if c.get("phase") != "BEFORE": continue
-            name = c.get("name", "Unknown")
-            is_rated = is_rated_contest("Codeforces", name)
-            start = c.get("startTimeSeconds")
-            if start: contests.append(("Codeforces", name, start, start - now_ts, is_rated))
-    except: pass
+    def get_cf():
+        try:
+            url = "https://codeforces.com/api/contest.list"
+            data = requests.get(url, timeout=10).json()
+            for c in data.get("result", []):
+                if c.get("phase") != "BEFORE": continue
+                name = c.get("name", "Unknown")
+                is_rated = is_rated_contest("Codeforces", name)
+                start = c.get("startTimeSeconds")
+                if start: contests.append(("Codeforces", name, start, start - now_ts, is_rated))
+        except: pass
 
-    try:
-        url = "https://www.codechef.com/api/list/contests/all"
-        data = requests.get(url, timeout=15).json()
-        for c in data.get("future_contests", []):
-            name = c.get("contest_name", "Unknown")
-            is_rated = is_rated_contest("CodeChef", name)
-            start_str = c.get("contest_start_date_iso")
-            if start_str:
-                start_dt = datetime.fromisoformat(start_str.replace("Z", "+00:00"))
-                start = start_dt.timestamp()
-                if start > now_ts:
-                    contests.append(("CodeChef", name, start, start - now_ts, is_rated))
-    except: pass
+    def get_cc():
+        try:
+            url = "https://www.codechef.com/api/list/contests/all"
+            data = requests.get(url, timeout=10).json()
+            for c in data.get("future_contests", []):
+                name = c.get("contest_name", "Unknown")
+                is_rated = is_rated_contest("CodeChef", name)
+                start_str = c.get("contest_start_date_iso")
+                if start_str:
+                    start_dt = datetime.fromisoformat(start_str.replace("Z", "+00:00"))
+                    start = start_dt.timestamp()
+                    if start > now_ts:
+                        contests.append(("CodeChef", name, start, start - now_ts, is_rated))
+        except: pass
 
-    try:
-        url = "https://leetcode.com/graphql"
-        query = {"query": "{ allContests { title startTime } }"}
-        res = requests.post(url, json=query, timeout=15).json()
-        for c in res.get("data", {}).get("allContests", []):
-            name = c.get("title", "Unknown")
-            is_rated = is_rated_contest("LeetCode", name)
-            start = c.get("startTime")
-            if start and start > now_ts:
-                contests.append(("LeetCode", name, start, start - now_ts, is_rated))
-    except: pass
+    def get_lc():
+        try:
+            url = "https://leetcode.com/graphql"
+            query = {"query": "{ allContests { title startTime } }"}
+            res = requests.post(url, json=query, timeout=10).json()
+            for c in res.get("data", {}).get("allContests", []):
+                name = c.get("title", "Unknown")
+                is_rated = is_rated_contest("LeetCode", name)
+                start = c.get("startTime")
+                if start and start > now_ts:
+                    contests.append(("LeetCode", name, start, start - now_ts, is_rated))
+        except: pass
+
+    threads = [
+        threading.Thread(target=get_cf),
+        threading.Thread(target=get_cc),
+        threading.Thread(target=get_lc)
+    ]
+    
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
 
     seen = set()
     unique = []
