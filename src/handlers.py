@@ -54,6 +54,7 @@ def get_college_menu():
         "keyboard": [
             [{"text": "🏫 CSE"}, {"text": "⚙️ MAE"}],
             [{"text": "📡 ECE"}, {"text": "🧮 MNC"}],
+            [{"text": "📊 My Attendance"}],
             [{"text": "🔙 Back to Main Menu"}]
         ],
         "resize_keyboard": True
@@ -271,6 +272,23 @@ def process_message(update):
     elif "Contests" in text:
         send_message(chat_id, "🏆 <b>Contests Menu</b>\nSelect an option below:", reply_markup=get_contest_menu())
         return
+
+    elif "Attendance" in text and "Warning" not in text:
+        stats = []
+        for key, rec in attendance.items():
+            if key.startswith(f"{chat_id}|"):
+                sub = key.split("|", 1)[1]
+                total = rec["attended"] + rec["bunked"]
+                perc = (rec["attended"] / total) * 100 if total > 0 else 100
+                color = "🟢" if perc >= 75 else "🔴"
+                stats.append(f"{color} <b>{escape_html(sub)}</b>: {perc:.1f}%  <i>({rec['attended']}/{total} classes)</i>")
+        
+        if stats:
+            send_message(chat_id, "📊 <b>Your Attendance Overview</b>\n\n" + "\n\n".join(stats))
+        else:
+            send_message(chat_id, "<i>No attendance records found yet! They'll appear here once you click Attending/Bunking on a class alert.</i>")
+        return
+
     elif "Colleges Menu" in text:
         return
     elif "Colleges" in text and "Back" not in text:
