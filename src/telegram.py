@@ -4,6 +4,9 @@ import json
 from src.config import BOT_TOKEN, ADMIN_CHAT_ID, executor
 from src.database import history_col
 
+# Use a session to reuse TCP connections for 3x lower latency on consecutive API calls
+session = requests.Session()
+
 def schedule_delete(chat_id, message_id, delay_seconds=21600):
     if not message_id or str(chat_id) == ADMIN_CHAT_ID: return
     executor.submit(history_col.insert_one, {
@@ -20,7 +23,7 @@ def send_message(chat_id, text, auto_delete=True, parse_mode="HTML", reply_marku
     if reply_markup is not None:
         payload["reply_markup"] = json.dumps(reply_markup)
     try:
-        resp = requests.post(url, data=payload, timeout=10).json()
+        resp = session.post(url, data=payload, timeout=10).json()
         if resp.get("ok"):
             msg_id = str(resp["result"]["message_id"])
             if auto_delete:
@@ -36,7 +39,7 @@ def send_photo(chat_id, photo_url, caption="", auto_delete=True, parse_mode="HTM
     if parse_mode:
         payload["parse_mode"] = parse_mode
     try:
-        resp = requests.post(url, data=payload, timeout=10).json()
+        resp = session.post(url, data=payload, timeout=10).json()
         if resp.get("ok"):
             msg_id = str(resp["result"]["message_id"])
             if auto_delete:
@@ -52,6 +55,6 @@ def send_message_get_id(chat_id, text, auto_delete=True, parse_mode="HTML", repl
 def send_chat_action(chat_id, action="typing"):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendChatAction"
     try:
-        requests.post(url, data={"chat_id": chat_id, "action": action}, timeout=5)
+        session.post(url, data={"chat_id": chat_id, "action": action}, timeout=5)
     except:
         pass

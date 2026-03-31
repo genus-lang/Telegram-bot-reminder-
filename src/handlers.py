@@ -10,6 +10,9 @@ from src.telegram import send_message, send_chat_action, schedule_delete
 from src.utils import extract_keywords, format_countdown, escape_html
 from src.scrapers import fetch_upcoming_contests, fetch_daily_challenge
 
+# Cache to avoid blocking the main thread with MongoDB lookups
+has_groups_cache = {}
+
 def get_main_menu():
     return {
         "keyboard": [[{"text": "🏆 Contests"}, {"text": "🎓 Colleges"}]],
@@ -246,9 +249,11 @@ def process_message(update):
         update_user_field(chat_id, "college_year", int(year))
         branch = users[chat_id].get("college_branch", "")
         doc_id = f"{branch}_Year{year}"
-        doc = timetable_col.find_one({"_id": doc_id})
-        has_groups = doc.get("has_groups", True) if doc else True
-        if has_groups:
+        if doc_id not in has_groups_cache:
+            doc = timetable_col.find_one({"_id": doc_id})
+            has_groups_cache[doc_id] = doc.get("has_groups", True) if doc else True
+        
+        if has_groups_cache[doc_id]:
             send_message(chat_id, f"✅ <b>Year {year} selected!</b>\n\nNow select your Group:", reply_markup=get_group_menu())
         else:
             update_user_field(chat_id, "college_group", 0)
