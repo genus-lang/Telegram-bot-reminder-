@@ -1,8 +1,9 @@
-# 🤖 Code Contest Alerts & Hybrid AI Support Bot
+# 🤖 Code Contest Alerts, College Reminders & Hybrid AI Support Bot
 
-A powerful, highly scalable Telegram Bot built in Python. This bot serves two primary purposes:
-1. **Automated Reminders:** Scrapes Codeforces, CodeChef, and LeetCode APIs to alert users of upcoming coding contests.
-2. **Hybrid AI Customer Support:** Features a smart auto-reply system that matches keywords to instantly answer user queries. If the bot doesn't know the answer, it forwards the message directly to the Admin. When the Admin replies, the bot **learns the answer** and stores it in the database for the next user!
+A powerful, highly scalable Telegram Bot built in Python. This bot serves multiple purposes for college students and competitive programmers:
+1. **Automated Coding Contest Reminders:** Scrapes Codeforces, CodeChef, LeetCode, AtCoder, HackerRank, HackerEarth, and GeeksforGeeks APIs to alert users of upcoming coding contests.
+2. **College Timetable & Lecture Alerts:** Users can receive automated reminders before their college lectures start. Users can also upload their own timetable image, which is parsed by an AI Vision model (Gemini/Groq) to automatically set up personalized class reminders.
+3. **Hybrid AI Customer Support:** Features a smart auto-reply system that matches keywords to instantly answer user queries. If the bot doesn't know the answer, it forwards the message directly to the Admin. When the Admin replies, the bot **learns the answer** and stores it in the database for the next user!
 
 ## 📁 Folder Structure
 ```
@@ -37,14 +38,15 @@ remainder-bot/
 ```
 
 ## ✨ Key Features
-* 🚀 **Multi-Platform Alerts:** Automatically tracks Codeforces, CodeChef, and LeetCode contests.
-* 💡 **Daily Coding Challenge:** Fetches LeetCode's daily challenge with difficulty, tags, and direct link.
-* 🎓 **College Lecture Reminders:** Sends class alerts based on branch, year, and group from MongoDB-stored timetables.
-* 🧠 **Self-Learning AI:** Keyword-matching engine that gets smarter as the Admin answers questions.
-* 🔧 **Admin Control Panel:** Separate admin interface with Stats, Broadcast, Announcers, and Pending Questions.
-* 🔕 **Manual Toggle:** Reminders persist until the user manually turns them off.
-* ☁️ **MongoDB Atlas:** All data synced to the cloud — zero local state dependencies.
-* 🧹 **6-Hour Auto-Delete:** Messages auto-cleaned from Telegram after 6 hours.
+* 🚀 **Extensive Platform Tracking:** Tracks Codeforces, CodeChef, LeetCode, AtCoder, HackerRank, HackerEarth, and GeeksforGeeks contests with an inline menu to toggle which platforms to receive alerts for.
+* 💡 **Daily Coding Challenge:** Fetches LeetCode's daily challenge with difficulty, tags, and a direct link.
+* 🎓 **Global & Custom College Timetables:** Sends class alerts based on standard timetables (e.g., branches, years). Users can also upload a photo of their timetable and the bot uses Gemini 1.5 Flash (with Groq Llama 3 Vision fallback) to extract the schedule.
+* ⏱ **Custom Reminder Times:** Users can manually select exactly how many minutes before a contest or lecture they want to be notified.
+* 🧠 **Self-Learning Auto-Reply AI:** Keyword-matching engine that answers common user questions based on what it learned directly from the Admin's previous replies.
+* 🔧 **Admin Control Panel:** Separate admin interface with commands for `/stats`, `/broadcast`, `/announcers`, and resolving Pending Questions.
+* 🚦 **Smart Rate Limiting:** Safe broadcast handling with built-in logic handling Telegram's 429 Too Many Requests, which prevents blocks when sending mass reminders.
+* ☁️ **Stateless Architecture:** Fully backed by MongoDB Atlas. Supports deployments on Koyeb, Render, or Railway with webhooks or continuous long polling without overlapping conflicts.
+* 🧹 **Message Auto-Cleanup:** Clutter-free chats by self-deleting sent messages after 6 hours using a background scheduler.
 
 ---
 

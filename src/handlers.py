@@ -10,7 +10,7 @@ from src.telegram import send_message, send_chat_action, schedule_delete, answer
 import requests
 import json
 import base64
-from src.config import GEMINI_API_KEY
+from src.config import GEMINI_API_KEY, GROQ_API_KEY
 from src.utils import extract_keywords, format_countdown, escape_html
 from src.scrapers import fetch_upcoming_contests, fetch_daily_challenge
 
@@ -177,7 +177,7 @@ def broadcast_announcement(msg_to_send, chat_id):
     send_message(chat_id, f"✅ <b>Broadcast complete:</b> Sent to <code>{success_count}</code> users.")
 
 def process_timetable_image(file_id, chat_id):
-    if not GEMINI_API_KEY:
+    if not GEMINI_API_KEY and not GROQ_API_KEY:
         send_message(chat_id, "❌ Error: AI API Key not configured by admin.")
         return False
         
@@ -189,23 +189,60 @@ def process_timetable_image(file_id, chat_id):
         r = requests.get(url, timeout=10)
         img_b64 = base64.b64encode(r.content).decode("utf-8")
         
-        gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
-        
         prompt = "Analyze this college timetable. Extract the schedule as a JSON object where the keys are days of the week (Monday, Tuesday, etc.) and values are arrays of objects with 'start' (HH:MM in 24hr format), 'subject' (string), 'room' (string), and 'faculty' (string). Only return the raw JSON object without markdown blocks or formatting. Do not wrap in ```json."
         
-        payload = {
-            "contents": [{
-                "parts": [
-                    {"text": prompt},
-                    {"inlineData": {"mimeType": "image/jpeg", "data": img_b64}}
-                ]
-            }]
-        }
+        text_resp = None
         
-        res = requests.post(gemini_url, json=payload, timeout=25).json()
-        text_resp = res["candidates"][0]["content"]["parts"][0]["text"].strip()
+        # Try Gemini first
+        if GEMINI_API_KEY:
+            try:
+                gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+                payload = {
+                    "contents": [{
+                        "parts": [
+                            {"text": prompt},
+                            {"inlineData": {"mimeType": "image/jpeg", "data": img_b64}}
+                        ]
+                    }]
+                }
+                res = requests.post(gemini_url, json=payload, timeout=25).json()
+                if "candidates" in res:
+                    text_resp = res["candidates"][0]["content"]["parts"][0]["text"].strip()
+            except Exception as ge:
+                print("Gemini API failed, falling back to Groq if available:", ge)
+        
+        # Fallback to Groq
+        if not text_resp and GROQ_API_KEY:
+            try:
+                groq_url = "https://api.groq.com/openai/v1/chat/completions"
+                headers = {
+                    "Authorization": f"Bearer {GROQ_API_KEY}",
+                    "Content-Type": "application/json"
+                }
+                payload = {
+                    "model": "llama-3.2-11b-vision-preview",
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "text", "text": prompt},
+                                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img_b64}"}}
+                            ]
+                        }
+                    ],
+                    "temperature": 0.1
+                }
+                res = requests.post(groq_url, headers=headers, json=payload, timeout=30).json()
+                if "choices" in res:
+                    text_resp = res["choices"][0]["message"]["content"].strip()
+            except Exception as e:
+                print("Groq parsing error:", e)
+
+        if not text_resp:
+            return False
+
         if text_resp.startswith("```json"): text_resp = text_resp[7:]
-        if text_resp.startswith("```"): text_resp = text_resp[3:]
+        elif text_resp.startswith("```"): text_resp = text_resp[3:]
         if text_resp.endswith("```"): text_resp = text_resp[:-3]
         
         schedule = json.loads(text_resp.strip())
