@@ -98,3 +98,9 @@ python tools/migrate_pdf.py
 | 📢 Broadcast | Send announcements to all users via `/announce` |
 | 👥 Announcers | View/add/remove authorized announcers |
 | 🔍 Pending Questions | View unanswered user questions |
+
+
+
+## License
+This project is licensed under the CC BY-NC 4.0 License.
+Commercial use is not allowed.
