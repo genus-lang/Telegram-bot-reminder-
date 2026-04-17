@@ -16,21 +16,29 @@ def schedule_delete(chat_id, message_id, delay_seconds=21600):
     })
 
 def send_message(chat_id, text, auto_delete=True, parse_mode="HTML", reply_markup=None):
+    import time
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     payload = {"chat_id": chat_id, "text": text}
     if parse_mode:
         payload["parse_mode"] = parse_mode
     if reply_markup is not None:
         payload["reply_markup"] = json.dumps(reply_markup)
-    try:
-        resp = session.post(url, data=payload, timeout=10).json()
-        if resp.get("ok"):
-            msg_id = str(resp["result"]["message_id"])
-            if auto_delete:
-                schedule_delete(chat_id, msg_id)
-            return msg_id
-    except:
-        pass
+    
+    for _ in range(3):
+        try:
+            resp = session.post(url, data=payload, timeout=10).json()
+            if resp.get("ok"):
+                msg_id = str(resp["result"]["message_id"])
+                if auto_delete:
+                    schedule_delete(chat_id, msg_id)
+                return msg_id
+            elif resp.get("error_code") == 429:
+                retry_after = resp.get("parameters", {}).get("retry_after", 1)
+                time.sleep(retry_after)
+                continue
+        except:
+            break
+            
     return None
 
 def send_photo(chat_id, photo_url, caption="", auto_delete=True, parse_mode="HTML"):
@@ -45,6 +53,17 @@ def send_photo(chat_id, photo_url, caption="", auto_delete=True, parse_mode="HTM
             if auto_delete:
                 schedule_delete(chat_id, msg_id)
             return msg_id
+    except:
+        pass
+    return None
+
+def get_file_url(file_id):
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/getFile?file_id={file_id}"
+    try:
+        resp = session.get(url, timeout=10).json()
+        if resp.get("ok"):
+            path = resp["result"]["file_path"]
+            return f"https://api.telegram.org/file/bot{BOT_TOKEN}/{path}"
     except:
         pass
     return None

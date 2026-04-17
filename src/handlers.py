@@ -6,7 +6,11 @@ from src.database import (
     users, users_col, pending, pending_col,
     knowledge, knowledge_col, announcers, announcers_col, timetable_col, attendance, attendance_col
 )
-from src.telegram import send_message, send_chat_action, schedule_delete, answer_callback_query, edit_message_text
+from src.telegram import send_message, send_chat_action, schedule_delete, answer_callback_query, edit_message_text, get_file_url
+import requests
+import json
+import base64
+from src.config import GEMINI_API_KEY
 from src.utils import extract_keywords, format_countdown, escape_html
 from src.scrapers import fetch_upcoming_contests, fetch_daily_challenge
 
@@ -43,7 +47,7 @@ def get_contest_menu():
         "keyboard": [
             [{"text": "⏰ 15 Min"}, {"text": "⏰ 30 Min"}, {"text": "⏰ 60 Min"}],
             [{"text": "📅 Upcoming Contests"}, {"text": "💡 Daily Challenge"}],
-            [{"text": "🔕 Turn Off Contest Alerts"}],
+            [{"text": "⚙️ Platforms"}, {"text": "🔕 Turn Off Alerts"}],
             [{"text": "🔙 Back to Main Menu"}]
         ],
         "resize_keyboard": True
@@ -52,10 +56,19 @@ def get_contest_menu():
 def get_college_menu():
     return {
         "keyboard": [
-            [{"text": "🏫 CSE"}, {"text": "⚙️ MAE"}],
-            [{"text": "📡 ECE"}, {"text": "🧮 MNC"}],
+            [{"text": "🏫 Select Pre-loaded Presets"}, {"text": "📸 Upload Custom Timetable"}],
             [{"text": "📊 My Attendance"}],
             [{"text": "🔙 Back to Main Menu"}]
+        ],
+        "resize_keyboard": True
+    }
+
+def get_preset_branch_menu():
+    return {
+        "keyboard": [
+            [{"text": "🏫 CSE"}, {"text": "⚙️ MAE"}],
+            [{"text": "📡 ECE"}, {"text": "🧮 MNC"}],
+            [{"text": "🔙 Back to Colleges"}]
         ],
         "resize_keyboard": True
     }
@@ -82,9 +95,9 @@ def get_group_menu():
 def get_lecture_reminder_menu():
     return {
         "keyboard": [
-            [{"text": "🔔 5 Min Before"}, {"text": "🔔 15 Min Before"}],
-            [{"text": "🔔 30 Min Before"}, {"text": "🔕 Turn Off Reminders"}],
-            [{"text": "🔙 Back to Colleges"}]
+            [{"text": "🔔 5 Min Before"}, {"text": "🔔 10 Min Before"}],
+            [{"text": "🔔 15 Min Before"}, {"text": "🔔 30 Min Before"}],
+            [{"text": "🔕 Turn Off Reminders"}, {"text": "🔙 Back to Colleges"}]
         ],
         "resize_keyboard": True
     }
@@ -163,8 +176,75 @@ def broadcast_announcement(msg_to_send, chat_id):
         time.sleep(0.05)
     send_message(chat_id, f"✅ <b>Broadcast complete:</b> Sent to <code>{success_count}</code> users.")
 
+def process_timetable_image(file_id, chat_id):
+    if not GEMINI_API_KEY:
+        send_message(chat_id, "❌ Error: AI API Key not configured by admin.")
+        return False
+        
+    url = get_file_url(file_id)
+    if not url:
+        return False
+        
+    try:
+        r = requests.get(url, timeout=10)
+        img_b64 = base64.b64encode(r.content).decode("utf-8")
+        
+        gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+        
+        prompt = "Analyze this college timetable. Extract the schedule as a JSON object where the keys are days of the week (Monday, Tuesday, etc.) and values are arrays of objects with 'start' (HH:MM in 24hr format), 'subject' (string), 'room' (string), and 'faculty' (string). Only return the raw JSON object without markdown blocks or formatting. Do not wrap in ```json."
+        
+        payload = {
+            "contents": [{
+                "parts": [
+                    {"text": prompt},
+                    {"inlineData": {"mimeType": "image/jpeg", "data": img_b64}}
+                ]
+            }]
+        }
+        
+        res = requests.post(gemini_url, json=payload, timeout=25).json()
+        text_resp = res["candidates"][0]["content"]["parts"][0]["text"].strip()
+        if text_resp.startswith("```json"): text_resp = text_resp[7:]
+        if text_resp.startswith("```"): text_resp = text_resp[3:]
+        if text_resp.endswith("```"): text_resp = text_resp[:-3]
+        
+        schedule = json.loads(text_resp.strip())
+        
+        # Save to DB
+        doc_id = f"Custom_{chat_id}"
+        custom_doc = {
+            "_id": doc_id,
+            "has_groups": False,
+            "groups": {
+                "0": schedule
+            }
+        }
+        executor.submit(timetable_col.update_one, {"_id": doc_id}, {"$set": custom_doc}, upsert=True)
+        return True
+    except Exception as e:
+        print("Gemini parsing error:", e)
+        return False
+
 # Track announcers waiting to send a message
 _announcer_pending = set()
+
+def send_platforms_menu(chat_id):
+    user = users.get(str(chat_id), {})
+    prefs = user.get("platforms", ["Codeforces", "LeetCode", "CodeChef"])
+    
+    platforms = ["Codeforces", "LeetCode", "CodeChef", "AtCoder", "HackerRank", "HackerEarth", "GeeksforGeeks"]
+    
+    keyboard = []
+    for i in range(0, len(platforms), 2):
+        row = []
+        for p in platforms[i:i+2]:
+            status = "✅" if p in prefs else "❌"
+            row.append({"text": f"{status} {p}", "callback_data": f"toggle_platform:{p}"})
+        keyboard.append(row)
+        
+    keyboard.append([{"text": "✅ Enable All", "callback_data": "toggle_platform:all"}, {"text": "❌ Disable All", "callback_data": "toggle_platform:none"}])
+    
+    send_message(chat_id, "⚙️ <b>Toggle Platforms</b>\n\nTap to enable/disable notifications for each platform:", reply_markup={"inline_keyboard": keyboard})
 
 def handle_callback(query):
     query_id = query["id"]
@@ -172,6 +252,38 @@ def handle_callback(query):
     msg_id = query["message"]["message_id"]
     data = query["data"]
     
+    if data.startswith("toggle_platform:"):
+        ensure_user(chat_id)
+        user = users[chat_id]
+        prefs = user.get("platforms", ["Codeforces", "LeetCode", "CodeChef"])
+        p = data.split(":")[1]
+        
+        all_platforms = ["Codeforces", "LeetCode", "CodeChef", "AtCoder", "HackerRank", "HackerEarth", "GeeksforGeeks"]
+        if p == "all":
+            prefs = all_platforms.copy()
+        elif p == "none":
+            prefs = []
+        elif p in prefs:
+            prefs.remove(p)
+        else:
+            prefs.append(p)
+            
+        update_user_field(chat_id, "platforms", prefs)
+        
+        # Re-generate the keyboard
+        keyboard = []
+        for i in range(0, len(all_platforms), 2):
+            row = []
+            for plat in all_platforms[i:i+2]:
+                status = "✅" if plat in prefs else "❌"
+                row.append({"text": f"{status} {plat}", "callback_data": f"toggle_platform:{plat}"})
+            keyboard.append(row)
+        keyboard.append([{"text": "✅ Enable All", "callback_data": "toggle_platform:all"}, {"text": "❌ Disable All", "callback_data": "toggle_platform:none"}])
+        
+        answer_callback_query(query_id, "Updated!")
+        edit_message_text(chat_id, msg_id, "⚙️ <b>Toggle Platforms</b>\n\nTap to enable/disable notifications for each platform:", {"inline_keyboard": keyboard})
+        return
+
     if data.startswith("att_y_") or data.startswith("att_n_"):
         is_attending = data.startswith("att_y_")
         subject = data[6:]
@@ -218,15 +330,42 @@ def process_message(update):
     chat_id = str(msg["chat"]["id"])
     msg_id = msg.get("message_id")
     if msg_id: schedule_delete(chat_id, msg_id)
+    
+    # Handle Photo Uploads for Custom Timetables
+    if msg.get("photo"):
+        user_state = users.get(chat_id, {}).get("state")
+        if user_state == "awaiting_timetable_photo":
+            send_message(chat_id, "📸 <i>Processing timetable image... Please wait. This takes about 10-15 seconds.</i>")
+            file_id = msg["photo"][-1]["file_id"]
+            success = process_timetable_image(file_id, chat_id)
+            if success:
+                update_user_field(chat_id, "college_branch", "Custom")
+                update_user_field(chat_id, "college_year", chat_id)
+                update_user_field(chat_id, "college_group", 0)
+                update_user_field(chat_id, "state", "awaiting_reminder_mins")
+                send_message(chat_id, "✅ <b>Timetable successfully extracted and saved!</b>\n\nHow many minutes before each class should I remind you? (Type a number, e.g., <b>10</b> or <b>20</b>)", reply_markup=get_lecture_reminder_menu())
+            else:
+                send_message(chat_id, "❌ Sorry, the AI couldn't parse that image accurately. Please ensure the image is a clear weekly timetable and try sending it again.")
+        return
+
     text = msg.get("text", "").strip()
     if not text: return
     set_active(chat_id)
+    
+    # State Machine Handling for Custom Reminder Minutes
+    user_state = users.get(chat_id, {}).get("state")
+    if user_state == "awaiting_reminder_mins" and text.isdigit():
+        mins = int(text)
+        update_user_field(chat_id, "college_reminder", mins * 60)
+        update_user_field(chat_id, "state", None)
+        send_message(chat_id, f"🎉 <b>Setup Complete!</b>\n\nI will remind you exactly <b>{mins} minutes</b> before your scheduled custom lectures begin!", reply_markup=get_main_menu())
+        return
 
     # --- Convert Natural Language to Commands ---
     text_lower = text.lower()
     if text_lower in ["cancel", "stop", "abort"]: text = "/cancel"
     elif text_lower in ["announcers", "announcers list"]: text = "/announcers"
-    elif text_lower in ["start", "hello", "hi", "hey"]: text = "/start"
+    elif text_lower in ["start", "hello", "hi", "hey", "menu", "home"]: text = "/start"
     elif text_lower in ["stats", "statistics"]: text = "/stats"
     elif text_lower in ["next", "upcoming", "upcoming contests"]: text = "/next"
     elif text_lower in ["15", "15 min", "15 mins", "15 minutes"]: text = "/15"
@@ -265,6 +404,9 @@ def process_message(update):
         else:
             send_message(chat_id, "❌ <i>Could not fetch today's challenge. Try again later!</i>")
         return
+    elif "Platforms" in text:
+        send_platforms_menu(chat_id)
+        return
     elif "Upcoming Contests" in text:
         text = "/next"
     elif "Contests Menu" in text:
@@ -292,14 +434,21 @@ def process_message(update):
     elif "Colleges Menu" in text:
         return
     elif "Colleges" in text and "Back" not in text:
-        send_message(chat_id, "🎓 <b>Colleges Menu</b>\nSelect your branch:", reply_markup=get_college_menu())
+        send_message(chat_id, "🎓 <b>Colleges Menu</b>\nSelect an option:", reply_markup=get_college_menu())
+        return
+    elif "Select Pre-loaded Presets" in text:
+        send_message(chat_id, "🎓 <b>Preset Colleges</b>\nSelect your branch:", reply_markup=get_preset_branch_menu())
+        return
+    elif "Upload Custom Timetable" in text:
+        update_user_field(chat_id, "state", "awaiting_timetable_photo")
+        send_message(chat_id, "📸 <b>Custom Timetable</b>\n\nPlease send a clear image of your weekly schedule. Make sure it shows days, times, subjects, rooms, and faculty.\n\nType <b>Cancel</b> to exit.", reply_markup={"keyboard": [[{"text": "Cancel"}]], "resize_keyboard": True})
         return
     elif "Main Menu" in text:
         menu = get_admin_menu() if chat_id == ADMIN_CHAT_ID else get_main_menu()
         send_message(chat_id, "🏠 <b>Main Menu</b>\nChoose a category:", reply_markup=menu)
         return
     elif "Back to Colleges" in text:
-        send_message(chat_id, "🎓 <b>Colleges Menu</b>\nSelect your branch:", reply_markup=get_college_menu())
+        send_message(chat_id, "🎓 <b>Colleges Menu</b>\nSelect an option:", reply_markup=get_college_menu())
         return
         
     elif any(b in text for b in ["CSE", "MAE", "ECE", "MNC"]):
@@ -321,18 +470,26 @@ def process_message(update):
             send_message(chat_id, f"✅ <b>Year {year} selected!</b>\n\nNow select your Group:", reply_markup=get_group_menu())
         else:
             update_user_field(chat_id, "college_group", 0)
-            send_message(chat_id, f"✅ <b>Year {year} selected!</b>\n\nWhen should I remind you about your scheduled lectures?", reply_markup=get_lecture_reminder_menu())
+            update_user_field(chat_id, "state", "awaiting_reminder_mins")
+            send_message(chat_id, f"✅ <b>Year {year} selected!</b>\n\nWhen should I remind you about your scheduled lectures?\n(You can use the buttons or just type any number of minutes, e.g., <b>10</b>)", reply_markup=get_lecture_reminder_menu())
         return
         
     elif any(g in text for g in ["Group 1", "Group 2"]):
         group = next(g.split(" ")[1] for g in ["Group 1", "Group 2"] if g in text)
         update_user_field(chat_id, "college_group", int(group))
-        send_message(chat_id, f"✅ <b>Group {group} selected!</b>\n\nWhen should I remind you about your scheduled lectures?", reply_markup=get_lecture_reminder_menu())
+        update_user_field(chat_id, "state", "awaiting_reminder_mins")
+        send_message(chat_id, f"✅ <b>Group {group} selected!</b>\n\nWhen should I remind you about your scheduled lectures?\n(You can use the buttons or just type any number of minutes, e.g., <b>10</b>)", reply_markup=get_lecture_reminder_menu())
         return
         
-    elif "Before" in text and any(m in text for m in ["15 Min", "30 Min", "5 Min"]):
-        minutes = int(next(m.split(" ")[0] for m in ["15 Min", "30 Min", "5 Min"] if m in text))
+    elif text == "/cancel" and users.get(chat_id, {}).get("state") == "awaiting_timetable_photo":
+        update_user_field(chat_id, "state", None)
+        send_message(chat_id, "❌ <i>Cancelled custom timetable upload.</i>", reply_markup=get_main_menu())
+        return
+
+    elif "Before" in text and any(m in text for m in ["15 Min", "30 Min", "10 Min", "5 Min"]):
+        minutes = int(next(m.split(" ")[0] for m in ["15 Min", "30 Min", "10 Min", "5 Min"] if m in text))
         update_user_field(chat_id, "college_reminder", minutes * 60)
+        update_user_field(chat_id, "state", None)
         send_message(chat_id, f"🎉 <b>Setup Complete!</b>\n\nI will remind you exactly <b>{minutes} minutes</b> before your scheduled {users[chat_id].get('college_branch', 'College')} lectures begin!", reply_markup=get_main_menu())
         return
 
@@ -341,7 +498,7 @@ def process_message(update):
         send_message(chat_id, "🔕 <b>College Reminders Disabled!</b>\n\nYou will no longer receive notifications for lectures. Contest alerts remain active.\n\n<i>To re-enable, go to Colleges and set up again.</i>", reply_markup=get_main_menu() if chat_id != ADMIN_CHAT_ID else get_admin_menu())
         return
 
-    elif "Turn Off Contest" in text:
+    elif "Turn Off Alerts" in text or "Turn Off Contest" in text:
         update_reminder(chat_id, 0)
         send_message(chat_id, "🔕 <b>Contest Alerts Disabled!</b>\n\nYou will no longer receive contest reminders. College lecture alerts remain active.\n\n<i>To re-enable, go to Contests and pick a time.</i>", reply_markup=get_main_menu() if chat_id != ADMIN_CHAT_ID else get_admin_menu())
         return
@@ -496,7 +653,7 @@ def process_message(update):
             send_message(chat_id, "😕 <i>No upcoming contests found in the next 2 weeks.</i>")
         else:
             lines = ["⏱ <b>Upcoming Contests</b>\n"]
-            platform_emoji = {"Codeforces": "🟦", "CodeChef": "🟧", "LeetCode": "🟨"}
+            platform_emoji = {"Codeforces": "🟦", "CodeChef": "🟧", "LeetCode": "🟨", "AtCoder": "⬛", "HackerRank": "🟩", "HackerEarth": "🟪", "GeeksforGeeks": "🟢"}
             for i, (platform, name, start_ts, time_left, is_rated) in enumerate(upcoming[:10]):
                 emoji = platform_emoji.get(platform, "🔹")
                 countdown = format_countdown(time_left)

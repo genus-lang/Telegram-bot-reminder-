@@ -15,6 +15,10 @@ def is_rated_contest(platform, name):
         return "starter" in name_lower
     elif platform == "LeetCode":
         return "weekly" in name_lower
+    elif platform == "AtCoder":
+        return "beginner" in name_lower or "regular" in name_lower or "grand" in name_lower
+    elif platform in ["HackerRank", "HackerEarth", "GeeksforGeeks"]:
+        return True # For now, consider all of these as rated or notify-worthy
     return True
 
 def fetch_upcoming_contests():
@@ -62,10 +66,39 @@ def fetch_upcoming_contests():
                     contests.append(("LeetCode", name, start, start - now_ts, is_rated))
         except: pass
 
+    def get_others():
+        try:
+            url = "https://kontests.net/api/v1/all"
+            data = requests.get(url, timeout=10).json()
+            platform_map = {
+                "AtCoder": "AtCoder",
+                "HackerRank": "HackerRank",
+                "HackerEarth": "HackerEarth",
+                "GeeksforGeeks": "GeeksforGeeks"
+            }
+            for c in data:
+                site = c.get("site")
+                if site not in platform_map: continue
+                platform = platform_map[site]
+                name = c.get("name", "Unknown")
+                
+                start_str = c.get("start_time")
+                if not start_str: continue
+                try:
+                    start_dt = datetime.fromisoformat(start_str.replace("Z", "+00:00")).astimezone(timezone.utc)
+                    start = start_dt.timestamp()
+                except: continue
+                
+                is_rated = is_rated_contest(platform, name)
+                if start > now_ts:
+                    contests.append((platform, name, start, start - now_ts, is_rated))
+        except: pass
+
     threads = [
         threading.Thread(target=get_cf),
         threading.Thread(target=get_cc),
-        threading.Thread(target=get_lc)
+        threading.Thread(target=get_lc),
+        threading.Thread(target=get_others)
     ]
     
     for t in threads:
@@ -87,6 +120,11 @@ def alert_key(platform, chat_id, contest_name):
     return f"{platform}:{chat_id}:{contest_name}"
 
 def maybe_send(chat_id, platform, contest_name, time_left_seconds):
+    user = users.get(str(chat_id), {})
+    prefs = user.get("platforms", ["Codeforces", "LeetCode", "CodeChef"])
+    if platform not in prefs:
+        return
+
     key = alert_key(platform, chat_id, contest_name)
     if key in sent: return
     minutes_left = max(1, int(time_left_seconds // 60))
@@ -109,7 +147,7 @@ def check_codeforces():
             name = contest.get("name", "Unknown contest")
             start = contest.get("startTimeSeconds")
             if not start: continue
-            for chat_id, info in users.items():
+            for chat_id, info in list(users.items()):
                 reminder = int(info.get("reminder", DEFAULT_REMINDER))
                 if reminder <= 0: continue
                 time_left = start - now
@@ -128,7 +166,7 @@ def check_codechef():
             if not start_str: continue
             start = datetime.fromisoformat(start_str.replace("Z", "+00:00"))
             time_left = (start - now).total_seconds()
-            for chat_id, info in users.items():
+            for chat_id, info in list(users.items()):
                 reminder = int(info.get("reminder", DEFAULT_REMINDER))
                 if reminder <= 0: continue
                 if 0 < time_left <= reminder:
@@ -146,12 +184,50 @@ def check_leetcode():
             name = contest.get("title", "Unknown contest")
             start = contest.get("startTime")
             if start is None: continue
-            for chat_id, info in users.items():
+            for chat_id, info in list(users.items()):
                 reminder = int(info.get("reminder", DEFAULT_REMINDER))
                 if reminder <= 0: continue
                 time_left = start - now
                 if 0 < time_left <= reminder:
                     maybe_send(chat_id, "LeetCode", name, time_left)
+    except: pass
+
+def check_other_platforms():
+    try:
+        url = "https://kontests.net/api/v1/all"
+        data = requests.get(url, timeout=15).json()
+        now = datetime.utcnow()
+        for contest in data:
+            site = contest.get("site", "Unknown")
+            name = contest.get("name", "Unknown contest")
+            
+            platform_map = {
+                "AtCoder": "AtCoder",
+                "HackerRank": "HackerRank",
+                "HackerEarth": "HackerEarth",
+                "GeeksforGeeks": "GeeksforGeeks"
+            }
+            if site not in platform_map:
+                continue
+                
+            platform = platform_map[site]
+            start_str = contest.get("start_time")
+            if not start_str: continue
+            
+            # kontests returns ISO 8601 strings usually like 2023-01-01T12:00:00.000Z
+            try:
+                start = datetime.fromisoformat(start_str.replace("Z", "+00:00")).astimezone(timezone.utc).replace(tzinfo=None)
+            except: continue
+                
+            time_left = (start - now).total_seconds()
+            
+            if time_left < 0: continue
+            
+            for chat_id, info in list(users.items()):
+                reminder = int(info.get("reminder", DEFAULT_REMINDER))
+                if reminder <= 0: continue
+                if 0 < time_left <= reminder:
+                    maybe_send(chat_id, platform, name, time_left)
     except: pass
 
 def fetch_daily_challenge():

@@ -12,7 +12,7 @@ def check_lectures():
         now = datetime.now(ist_tz)
         day_name = now.strftime("%A")
         
-        for chat_id, info in users.items():
+        for chat_id, info in list(users.items()):
             branch = info.get("college_branch")
             year = info.get("college_year")
             group = info.get("college_group")
@@ -24,7 +24,10 @@ def check_lectures():
                 continue
                 
             try:
-                doc_id = f"{branch}_Year{year}"
+                if branch == "Custom":
+                    doc_id = f"Custom_{chat_id}"
+                else:
+                    doc_id = f"{branch}_Year{year}"
                 
                 # Fetch entirely from safe RAM lookup mapping
                 if doc_id not in timetable_cache:

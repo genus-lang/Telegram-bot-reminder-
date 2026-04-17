@@ -40,7 +40,7 @@ def send_morning_digests():
     else:
         dc_text = "<i>Daily challenge unavailable right now.</i>"
     
-    for chat_id, info in users.items():
+    for chat_id, info in list(users.items()):
         reminder = info.get("college_reminder", 0)
         branch = info.get("college_branch")
         year = info.get("college_year")

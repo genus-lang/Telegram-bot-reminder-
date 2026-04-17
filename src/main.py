@@ -5,7 +5,7 @@ import requests
 from flask import Flask
 from src.config import BOT_TOKEN, CHECK_EVERY_SECONDS, executor
 from src.database import pending, pending_col, history_col
-from src.scrapers import check_codeforces, check_codechef, check_leetcode
+from src.scrapers import check_codeforces, check_codechef, check_leetcode, check_other_platforms
 from src.timetable import check_lectures
 from src.handlers import process_message
 
@@ -38,6 +38,7 @@ def handle_updates():
     try:
         data = requests.get(url, params=params, timeout=15).json()
     except:
+        time.sleep(5)
         return
     for update in data.get("result", []):
         last_update_id = update["update_id"]
@@ -82,6 +83,7 @@ def background_jobs():
         check_codeforces()
         check_codechef()
         check_leetcode()
+        check_other_platforms()
         check_lectures()
         cleanup_pending()
         delete_expired_messages()
