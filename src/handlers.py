@@ -57,7 +57,7 @@ def get_college_menu():
     return {
         "keyboard": [
             [{"text": "🏫 Select Pre-loaded Presets"}, {"text": "📸 Upload Custom Timetable"}],
-            [{"text": "📊 My Attendance"}],
+            [{"text": "📊 My Attendance"}, {"text": "🛑 Stop College Alerts"}],
             [{"text": "🔙 Back to Main Menu"}]
         ],
         "resize_keyboard": True
@@ -472,6 +472,10 @@ def process_message(update):
         return
     elif "Colleges" in text and "Back" not in text:
         send_message(chat_id, "🎓 <b>Colleges Menu</b>\nSelect an option:", reply_markup=get_college_menu())
+        return
+    elif "Stop College Alerts" in text:
+        update_user_field(chat_id, "college_reminder", 0)
+        send_message(chat_id, "🛑 <b>College Alerts Disabled!</b>\nYou will no longer receive any lecture reminders.", reply_markup=get_college_menu())
         return
     elif "Select Pre-loaded Presets" in text:
         send_message(chat_id, "🎓 <b>Preset Colleges</b>\nSelect your branch:", reply_markup=get_preset_branch_menu())
